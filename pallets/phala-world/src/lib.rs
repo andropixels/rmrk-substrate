@@ -244,6 +244,24 @@ pub mod pallet {
 	// Dispatchable functions must be annotated with a weight and must return a DispatchResult.
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
+		// TODO: pub fn claim_spirit
+
+		// TODO: pub fn buy_founder_egg
+
+		// TODO: pub fn buy_legendary_egg
+
+		// TODO: pub fn preorder_egg
+
+		// TODO: pub fn mint_eggs
+
+		// TODO: pub fn claim_refund
+
+		// TODO: pub fn start_hatching_egg
+
+		// TODO: pub fn hatch_egg
+
+		// TODO: pub fn update_hatch_time
+
 		/// An example dispatchable that takes a singles value as a parameter, writes the value to
 		/// storage and emits an event. This function must be dispatched by a signed extrinsic.
 		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
