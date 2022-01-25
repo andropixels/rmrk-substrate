@@ -88,6 +88,8 @@ pub struct HatchEggInfo<CollectionId, NftId, BlockNumber> {
 pub mod pallet {
 	use frame_support::{dispatch::DispatchResult, pallet_prelude::*};
 	use frame_system::pallet_prelude::*;
+	use rmrk_traits::Nft;
+	use rmrk_traits::primitives::{CollectionId, NftId};
 
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
@@ -123,15 +125,95 @@ pub mod pallet {
 	// The pallet's runtime storage items.
 	#[pallet::storage]
 	#[pallet::getter(fn something)]
-	// Learn more about declaring storage items:
-	// https://docs.substrate.io/v3/runtime/storage#declaring-storage-items
 	pub type Something<T> = StorageValue<_, u32>;
 
 	// Pallets use events to inform users when important changes are made.
-	// https://docs.substrate.io/v3/runtime/events-and-errors
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
+		/// Phala World clock zero day started
+		WorldClockStarted {
+			start_time: T::BlockNumber,
+			era: u128,
+		},
+		/// Start of a new era
+		NewEra {
+			time: T::BlockNumber,
+			era: u128,
+		},
+		/// Spirit has been claimed from the whitelist
+		SpiritClaimed {
+			collection_id: CollectionId,
+			nft_id: NftId,
+			owner: T::AccountId,
+		},
+		/// Founder egg has been purchased
+		FounderEggPurchased {
+			collection_id: CollectionId,
+			nft_id: NftId,
+			owner: T::AccountId,
+		},
+		/// Legendary egg has been purchased
+		LegendaryEggPurchased {
+			collection_id: CollectionId,
+			nft_id: NftId,
+			owner: T::AccountId,
+		},
+		/// A chance to get an egg through preorder
+		EggPreordered {
+			price: T::Balance,
+			owner: T::AccountId,
+		},
+		/// Egg claimed from the winning preorder
+		EggClaimed {
+			collection_id: CollectionId,
+			nft_id: NftId,
+			owner: T::AccountId,
+		},
+		/// Refund claimed by owner that did not win an Egg
+		RefundClaimed {
+			price: T::Balance,
+			owner: T::AccountId,
+		},
+		/// Egg received food from an account
+		EggFoodReceived {
+			collection_id: CollectionId,
+			nft_id: NftId,
+			sender: T::AccountId,
+			owner: T::AccountId,
+		},
+		/// Egg owner has initiated the hatching sequence
+		StartedHatching {
+			collection_id: CollectionId,
+			nft_id: NftId,
+			owner: T::AccountId,
+		},
+		/// A top 10 fed egg of the era has updated their hatch time
+		HatchTimeUpdated {
+			collection_id: CollectionId,
+			nft_id: NftId,
+			owner: T::AccountId,
+			hatch_time: T::BlockNumber,
+		},
+		/// An egg has been hatched
+		EggHatched {
+			collection_id: CollectionId,
+			nft_id: NftId,
+			owner: T::AccountId,
+		},
+		/// Shell has been awakened from an egg being hatched and burned
+		ShellAwakened {
+			collection_id: CollectionId,
+			nft_id: NftId,
+			owner: T::AccountId,
+			career: u8,
+			race: u8,
+		},
+		/// Egg hatching has been disabled & no other eggs can be hatched
+		EggHatchingDisabled {
+			collection_id: CollectionId,
+			can_hatch: bool,
+		},
 		/// Event documentation should end with an array that provides descriptive names for event
 		/// parameters. [something, who]
 		SomethingStored(u32, T::AccountId),
@@ -140,6 +222,17 @@ pub mod pallet {
 	// Errors inform users that something went wrong.
 	#[pallet::error]
 	pub enum Error<T> {
+		AccountNotInWhitelist,
+		NoClaimAvailable,
+		SpiritAlreadyClaimed,
+		ClaimIsOver,
+		InsufficientFunds,
+		InvalidClaimTicket,
+		CannotHatchEgg,
+		CannotSendFoodToEgg,
+		NoFoodAvailable,
+		NoPermission,
+		CareerAndRaceAlreadyChosen,
 		/// Error names should be descriptive.
 		NoneValue,
 		/// Errors should have helpful documentation associated with them.
