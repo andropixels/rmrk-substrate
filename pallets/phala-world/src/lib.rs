@@ -1,8 +1,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
-/// Edit this file to define custom logic or remove it if it is not needed.
-/// Learn more about FRAME and the core library of Substrate FRAME pallets:
-/// <https://docs.substrate.io/v3/runtime/frame>
+use codec::{Encode, Decode};
+
 pub use pallet::*;
 
 #[cfg(test)]
@@ -13,6 +12,58 @@ mod tests;
 
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
+
+/// Egg Types of Normal, Legendary & Founder
+#[derive(Encode, Decode, Copy, Clone, PartialEq)]
+pub enum EggType {
+	Normal = 0,
+	Legendary = 1,
+	Founder = 2,
+}
+
+impl Default for EggType {
+	fn default() -> Self {
+		EggType::Normal
+	}
+}
+
+impl EggType {
+	pub fn from_u8(value: u8) -> EggType {
+		match value {
+			0 => EggType::Normal,
+			1 => EggType::Legendary,
+			2 => EggType::Founder,
+			_ => EggType::Normal,
+		}
+	}
+}
+
+/// Four Races to choose from
+#[derive(Encode, Decode, Clone, PartialEq)]
+pub enum RaceType {
+	Cyborg = 0,
+	PhatrixAmrita = 1,
+	Devil = 2,
+	Robot = 3,
+}
+
+/// Five Careers to choose from
+#[derive(Encode, Decode, Clone, PartialEq)]
+pub enum CareerType {
+	HardwareDruid = 0,
+	RoboWarrior = 1,
+	NegotiateTrade = 2,
+	HackerWizard = 3,
+	Web3Monk = 4,
+}
+
+/// Phala World Clock
+pub struct WorldClockInfo<BlockNumber> {
+	/// Zero Day of Phala World
+	zero_day: BlockNumber,
+	/// Current number of eras
+	eras: u128,
+}
 
 #[frame_support::pallet]
 pub mod pallet {

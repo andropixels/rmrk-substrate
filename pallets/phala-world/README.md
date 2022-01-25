@@ -10,21 +10,31 @@ pub struct WorldClockInfo {
 }
 
 pub enum EggType {
-    /// Egg is a legendary egg
-    Legendary,
-    /// Egg is a rare egg
-    Rare,
     /// Egg is a normal egg
-    Normal,
+    Normal = 0,
+    /// Egg is a legendary egg
+    Legendary = 1,
+    /// Egg is a founder egg
+    Founder = 2,
 }
 
-pub struct EggTypeInfo<CollectionId, NftId> {
-    /// Egg type
-    egg_type: EggType,
-    /// Hatch timer
-    hatch_timer: T::BlockNumber,
-    /// Race
-    race: Race,
+/// Four Races to choose from
+#[derive(Encode, Decode, Clone, PartialEq)]
+pub enum RaceType {
+    Cyborg = 0,
+    PhatrixAmrita = 1,
+    Devil = 2,
+    Robot = 3,
+}
+
+/// Five Careers to choose from
+#[derive(Encode, Decode, Clone, PartialEq)]
+pub enum CareerType {
+    HardwareDruid = 0,
+    RoboWarrior = 1,
+    NegotiateTrade = 2,
+    HackerWizard = 3,
+    Web3Monk = 4,
 }
 
 ```
