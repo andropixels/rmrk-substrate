@@ -13,6 +13,9 @@ mod tests;
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
 
+/// Constant for amount of time it takes for an Egg to hatch after hatching is started
+pub const HATCHING_DURATION: u128 = 1_000_000;
+
 /// Egg Types of Normal, Legendary & Founder
 #[derive(Encode, Decode, Copy, Clone, PartialEq)]
 pub enum EggType {
@@ -57,12 +60,28 @@ pub enum CareerType {
 	Web3Monk = 4,
 }
 
+// TODO: Make this a trait w/ function to start the world clock & auto update eras
+
 /// Phala World Clock
 pub struct WorldClockInfo<BlockNumber> {
 	/// Zero Day of Phala World
 	zero_day: BlockNumber,
 	/// Current number of eras
 	eras: u128,
+}
+
+// TODO: Make this a trait w/ functions to update hatching duration & get time left to hatch
+
+/// Hatch info for Eggs
+pub struct HatchEggInfo<CollectionId, NftId, BlockNumber> {
+	/// Collection Id of the Egg
+	collection_id: CollectionId,
+	/// Nft Id of the Egg
+	nft_id: NftId,
+	/// Start hatching event block number
+	start_hatching: BlockNumber,
+	/// Time duration for hatching
+	hatching_duration: u128,
 }
 
 #[frame_support::pallet]
@@ -81,8 +100,27 @@ pub mod pallet {
 	#[pallet::generate_store(pub(super) trait Store)]
 	pub struct Pallet<T>(_);
 
+	/// Stores all of the valid claimed spirits from the airdrop by serial id & bool true if claimed
+	#[pallet::storage]
+	#[pallet::getter(fn claimed_spirits)]
+	pub type ClaimedSpirits<T: Config> = StorageMap<_, Twox64Concat, u64, bool>;
+
+	/// Stores all of the valid claimed Eggs from the whitelist or preorder
+	#[pallet::storage]
+	#[pallet::getter(fn claimed_spirits)]
+	pub type ClaimedEggs<T: Config> = StorageMap<_, Twox64Concat, u64, bool>;
+
+	/// Food per Owner where an owner gets 5 food per era
+	#[pallet::storage]
+	#[pallet::getter(fn get_food_by_owner)]
+	pub type FoodByOwner<T: Config> = StorageMap<_, Twox64Concat, T::AccountId, u8>;
+
+	// TODO: Era index for Phala World
+	//#[pallet::storage]
+	//#[pallet::getter(fn get_next_era)]
+	//pub type EraIndex<T:Config> = StorageValue<_, , ValueQuery>;
+
 	// The pallet's runtime storage items.
-	// https://docs.substrate.io/v3/runtime/storage
 	#[pallet::storage]
 	#[pallet::getter(fn something)]
 	// Learn more about declaring storage items:
