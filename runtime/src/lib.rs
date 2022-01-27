@@ -313,6 +313,8 @@ impl pallet_rmrk_core::Config for Runtime {
 
 impl pallet_phala_world::Config for Runtime {
 	type Event = Event;
+	type ProtocolOrigin = frame_system::EnsureRoot<AccountId>;
+	type Currency = Balances;
 }
 
 parameter_types! {
