@@ -41,6 +41,8 @@ pub use pallet_template;
 
 pub use pallet_rmrk_core;
 
+pub use pallet_rmrk_market;
+
 pub use pallet_phala_world;
 
 /// An index to a block.
@@ -318,6 +320,17 @@ impl pallet_phala_world::Config for Runtime {
 }
 
 parameter_types! {
+	pub const MinimumOfferAmount: Balance = UNITS / 10_000;
+}
+
+impl pallet_rmrk_market::Config for Runtime {
+	type Event = Event;
+	type ProtocolOrigin = frame_system::EnsureRoot<AccountId>;
+	type Currency = Balances;
+	type MinimumOfferAmount = MinimumOfferAmount;
+}
+
+parameter_types! {
 	pub const ClassDeposit: Balance = 100 * DOLLARS;
 	pub const InstanceDeposit: Balance = DOLLARS;
 	pub const KeyLimit: u32 = 32;
@@ -370,6 +383,7 @@ construct_runtime!(
 		// Include the custom logic from the pallet-template in the runtime.
 		TemplateModule: pallet_template,
 		RmrkCore: pallet_rmrk_core::{Pallet, Call, Event<T>, Storage},
+		RmrkMarket: pallet_rmrk_market::{Pallet, Call, Storage, Event<T>},
 		PhalaWorld: pallet_phala_world::{Pallet, Call, Storage, Event<T>},
 		Uniques: pallet_uniques::{Pallet, Call, Storage, Event<T>},
 		Utility: pallet_utility::{Pallet, Call, Storage, Event},
