@@ -12,6 +12,7 @@ pub use pallet_rmrk_core::types::*;
 
 use rmrk_traits::{
 	EggInfo,
+	world_clock::WorldClock,
 	primitives::*,
 };
 
@@ -74,14 +75,6 @@ pub const HATCHING_DURATION: u128 = 1_000_000;
 //}
 
 // TODO: Make this a trait w/ function to start the world clock & auto update eras
-
-/// Phala World Clock
-pub struct WorldClockInfo<BlockNumber> {
-	/// Zero Day of Phala World
-	zero_day: BlockNumber,
-	/// Current number of eras
-	eras: u128,
-}
 
 #[frame_support::pallet]
 pub mod pallet {

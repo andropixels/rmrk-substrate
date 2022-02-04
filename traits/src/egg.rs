@@ -13,7 +13,7 @@ pub struct EggInfo<SerialId, CollectionId, NftId> {
     /// Egg id of the Egg RMRK NFT
     pub egg_id: SerialId,
     /// Egg type of the Egg RMRK NFT
-    pub egg_type: u8,
+    pub egg_type: EggType,
     /// Collection id of the Egg RMRK NFT
     pub collection_id: CollectionId,
     /// NFT id of the Egg RMRK NFT
