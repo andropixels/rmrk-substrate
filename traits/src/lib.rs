@@ -6,7 +6,6 @@ pub mod priority;
 pub mod property;
 pub mod resource;
 pub mod egg;
-pub mod world_clock;
 
 pub use collection::{Collection, CollectionInfo};
 pub use nft::{AccountIdOrCollectionNftTuple, Nft, NftInfo};
@@ -14,7 +13,6 @@ pub use priority::Priority;
 pub use property::Property;
 pub use resource::{Resource, ResourceInfo};
 pub use egg::EggInfo;
-use world_clock::{WorldClock, WorldClockInfo};
 
 pub mod primitives {
 	pub type CollectionId = u32;

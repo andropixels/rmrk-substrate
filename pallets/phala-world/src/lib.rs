@@ -12,7 +12,6 @@ pub use pallet_rmrk_core::types::*;
 
 use rmrk_traits::{
 	EggInfo,
-	world_clock::WorldClock,
 	primitives::*,
 };
 
@@ -74,13 +73,13 @@ pub const HATCHING_DURATION: u128 = 1_000_000;
 //	Web3Monk = 4,
 //}
 
-// TODO: Make this a trait w/ function to start the world clock & auto update eras
 
 #[frame_support::pallet]
 pub mod pallet {
 	use super::*;
 	use frame_support::{dispatch::DispatchResult, pallet_prelude::*};
 	use frame_system::pallet_prelude::*;
+	use sp_runtime::traits::StaticLookup;
 	use rmrk_traits::Nft;
 	use rmrk_traits::primitives::{CollectionId, NftId, SerialId};
 	use crate::{CareerType, EggType, RaceType};
@@ -118,15 +117,50 @@ pub mod pallet {
 	#[pallet::getter(fn get_food_by_owner)]
 	pub type FoodByOwner<T: Config> = StorageMap<_, Twox64Concat, T::AccountId, u8>;
 
-	// TODO: Era index for Phala World
-	//#[pallet::storage]
-	//#[pallet::getter(fn get_next_era)]
-	//pub type EraIndex<T:Config> = StorageValue<_, , ValueQuery>;
+	/// Phala World Zero Day `BlockNumber` this will be used to determine Eras
+	#[pallet::storage]
+	#[pallet::getter(fn zero_day)]
+	pub(super) type ZeroDay<T:Config> = StorageValue<_, T::BlockNumber, OptionQuery>;
+
+	/// Game Overlord account that functions as an Admin
+	#[pallet::storage]
+	#[pallet::getter(fn game_overlord)]
+	pub(super) type GameOverlord<T:Config> = StorageValue<_, T::AccountId, OptionQuery>;
 
 	// The pallet's runtime storage items.
 	#[pallet::storage]
 	#[pallet::getter(fn something)]
 	pub type Something<T> = StorageValue<_, u32>;
+
+	#[pallet::genesis_config]
+	pub struct GenesisConfig<T: Config> {
+		/// The `AccountId` of the GameOverlord
+		pub game_overlord: Option<T::AccountId>,
+		/// `BlockNumber` of Phala World Zero Day
+		pub zero_day: Option<T::BlockNumber>,
+	}
+
+	#[cfg(feature = "std")]
+	impl<T: Config> Default for GenesisConfig<T> {
+		fn default() -> Self {
+			Self {
+				game_overlord: None,
+				zero_day: None,
+			}
+		}
+	}
+
+	#[pallet::genesis_build]
+	impl<T: Config> GenesisBuild<T> for GenesisConfig<T> {
+		fn build(&self) {
+			if let Some(ref game_overlord) = self.game_overlord {
+				GameOverlord::<T>::put(game_overlord);
+			}
+			if let Some(ref zero_day) = self.zero_day {
+				ZeroDay::<T>::put(zero_day);
+			}
+		}
+	}
 
 	// Pallets use events to inform users when important changes are made.
 	#[pallet::event]
@@ -135,7 +169,6 @@ pub mod pallet {
 		/// Phala World clock zero day started
 		WorldClockStarted {
 			start_time: T::BlockNumber,
-			era: u128,
 		},
 		/// Start of a new era
 		NewEra {
@@ -215,6 +248,10 @@ pub mod pallet {
 			collection_id: CollectionId,
 			can_hatch: bool,
 		},
+		/// Change to a new GameOverlord from the \[old_game_overlord\]
+		GameOverlordChanged {
+			old_game_overlord: Option<T::AccountId>,
+		},
 		/// Event documentation should end with an array that provides descriptive names for event
 		/// parameters. [something, who]
 		SomethingStored(u32, T::AccountId),
@@ -223,6 +260,7 @@ pub mod pallet {
 	// Errors inform users that something went wrong.
 	#[pallet::error]
 	pub enum Error<T> {
+		WorldClockAlreadySet,
 		AccountNotInWhitelist,
 		NoClaimAvailable,
 		SpiritAlreadyClaimed,
@@ -438,6 +476,56 @@ pub mod pallet {
 			Self::deposit_event(Event::SomethingStored(something, who));
 			// Return a successful DispatchResultWithPostInfo
 			Ok(())
+		}
+
+		/// Authenticates the current sudo key and sets the given AccountId (`new`) as the new sudo
+		/// key.
+		///
+		/// Parameters:
+		/// - `origin`: Executed by root origin to assign the `GameOverlord`
+		/// - `new_game_overlord`: The Account to be decalred the `GameOverlord` and act as an Admin to
+		/// Phala World
+		#[pallet::weight(0)]
+		pub fn set_game_overlord(
+			origin: OriginFor<T>,
+			new_game_overlord: <T::Lookup as StaticLookup>::Source,
+		) -> DispatchResultWithPostInfo {
+			// This is a public call, so we ensure that the origin is some signed account.
+			let sender = ensure_signed(origin)?;
+			ensure!(Self::game_overlord().map_or(false, |k| sender == k), Error::<T>::NoPermission);
+			let new_game_overlord = T::Lookup::lookup(new_game_overlord)?;
+
+			Self::deposit_event(Event::GameOverlordChanged {
+				old_game_overlord: GameOverlord::<T>::get()
+			});
+
+			GameOverlord::<T>::put(&new_game_overlord);
+			// GameOverlord user does not pay a fee
+			Ok(Pays::No.into())
+		}
+
+		/// Phala World Zero Day is set to begin the tracking of the official time starting at the
+		/// current block when `initialize_world_clock` is called by the `GameOverlord`
+		///
+		/// Parameters:
+		/// `origin`: Expected to be called by the `GameOverlord`
+		#[pallet::weight(0)]
+		pub fn initialize_world_clock(
+			origin: OriginFor<T>,
+		) -> DispatchResultWithPostInfo {
+			let sender = ensure_signed(origin)?;
+			ensure!(Self::game_overlord().map_or(false, |k| sender == k), Error::<T>::NoPermission);
+			// Ensure ZeroDay is None as this can only be set once
+			ensure!(Self::zero_day() == None, Error::<T>::WorldClockAlreadySet);
+
+			let zero_day = <frame_system::Pallet<T>>::block_number();
+
+			ZeroDay::<T>::put(&zero_day);
+			Self::deposit_event(Event::WorldClockStarted {
+				start_time: zero_day,
+			});
+
+			Ok(Pays::No.into())
 		}
 
 		/// An example dispatchable that may throw a custom error.
