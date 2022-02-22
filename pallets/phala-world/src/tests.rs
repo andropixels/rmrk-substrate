@@ -19,6 +19,16 @@ fn stv(s: &str) -> Vec<u8> {
 	s.as_bytes().to_vec()
 }
 
+fn next_block() {
+	System::set_block_number(System::block_number() + 1);
+}
+
+fn fast_forward_to(n: u64) {
+	while System::block_number() < n {
+		next_block();
+	}
+}
+
 macro_rules! bvec {
 	($( $x:tt )*) => {
 		vec![$( $x )*].try_into().unwrap()
@@ -27,7 +37,7 @@ macro_rules! bvec {
 
 #[test]
 fn claimed_spirit_works() {
-	new_test_ext().execute_with(|| {
+	ExtBuilder::default().build().execute_with(|| {
 		// Dispatch a claim spirit
 		assert_ok!(PhalaWorld::claim_spirit(Origin::signed(ALICE), 1, bvec![0u8; 20], bvec![0u8; 20]));
 	});
@@ -35,7 +45,7 @@ fn claimed_spirit_works() {
 
 #[test]
 fn claimed_spirit_twice_fails() {
-	new_test_ext().execute_with(|| {
+	ExtBuilder::default().build().execute_with(|| {
 		// Dispatch a claim spirit
 		assert_ok!(PhalaWorld::claim_spirit(Origin::signed(ALICE), 1, bvec![0u8; 20], bvec![0u8; 20]));
 		// Fail to dispatch a second claim spirit
@@ -44,8 +54,16 @@ fn claimed_spirit_twice_fails() {
 }
 
 #[test]
+fn start_world_clock_works() {
+	ExtBuilder::default().build().execute_with(|| {
+		// Initialize the Phala World Clock
+		assert_ok!(PhalaWorld::initialize_world_clock(Origin::root()));
+	});
+}
+
+#[test]
 fn it_works_for_default_value() {
-	new_test_ext().execute_with(|| {
+	ExtBuilder::default().build().execute_with(|| {
 		// Dispatch a signed extrinsic.
 		assert_ok!(PhalaWorld::do_something(Origin::signed(ALICE), 42));
 		// Read pallet storage and assert an expected result.
@@ -55,7 +73,7 @@ fn it_works_for_default_value() {
 
 #[test]
 fn correct_error_for_none_value() {
-	new_test_ext().execute_with(|| {
+	ExtBuilder::default().build().execute_with(|| {
 		// Ensure the expected error is thrown when no value is present.
 		assert_noop!(PhalaWorld::cause_error(Origin::signed(ALICE)), Error::<Test>::NoneValue);
 	});
