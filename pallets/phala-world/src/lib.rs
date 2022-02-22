@@ -3,12 +3,14 @@
 use frame_support::{
 	dispatch::DispatchResult, ensure, traits::{Currency, tokens::nonfungibles::*}, transactional, BoundedVec,
 };
+use frame_support::traits::tokens::Balance;
 use frame_system::ensure_signed;
 
 use sp_std::prelude::*;
 use sp_std::result::Result;
 
 pub use pallet_rmrk_core::types::*;
+pub use pallet_rmrk_market;
 
 use rmrk_traits::{
 	EggInfo,
@@ -28,39 +30,47 @@ pub use pallet::*;
 
 /// Constant for amount of time it takes for an Egg to hatch after hatching is started
 pub const HATCHING_DURATION: u128 = 1_000_000;
+/// Constant for Collection ID for Eggs
+pub const EGGS_COLLECTION_ID: u32 = 0;
+/// Constant for Founder Eggs Price
+pub const FOUNDER_EGG_PRICE: u128 = 1_000_000;
+/// Constant for Legendary Eggs Price
+pub const LEGENDARY_EGG_PRICE: u128 = 100_000;
+/// Constant for Normal Eggs Price
+pub const NORMAL_EGG_PRICE: u128 = 1_000;
 
 // Egg Types of Normal, Legendary & Founder
-//#[derive(Encode, Decode, Copy, Clone, PartialEq)]
-//pub enum EggType {
-//	Normal = 0,
-//	Legendary = 1,
-//	Founder = 2,
-//}
-
-//impl Default for EggType {
-//	fn default() -> Self {
-//		EggType::Normal
-//	}
-//}
-
-//impl EggType {
-//	pub fn from_u8(value: u8) -> EggType {
-//		match value {
-//			0 => EggType::Normal,
-//			1 => EggType::Legendary,
-//			2 => EggType::Founder,
-//			_ => EggType::Normal,
-//		}
-//	}
-//}
+// #[derive(Encode, Decode, Copy, Clone, PartialEq)]
+// pub enum EggType {
+// 	Normal = 0,
+// 	Legendary = 1,
+// 	Founder = 2,
+// }
+//
+// impl Default for EggType {
+// 	fn default() -> Self {
+// 		EggType::Normal
+// 	}
+// }
+//
+// impl EggType {
+// 	pub fn from_u8(value: u8) -> EggType {
+// 		match value {
+// 			0 => EggType::Normal,
+// 			1 => EggType::Legendary,
+// 			2 => EggType::Founder,
+// 			_ => EggType::Normal,
+// 		}
+// 	}
+// }
 
 // Four Races to choose from
 //#[derive(Encode, Decode, Clone, PartialEq)]
 //pub enum RaceType {
 //	Cyborg = 0,
-//	PhatrixAmrita = 1,
-//	Devil = 2,
-//	Robot = 3,
+//	AISpectre = 1,
+//	XGene = 2,
+//	Pandroid = 3,
 //}
 
 // Five Careers to choose from
@@ -68,7 +78,7 @@ pub const HATCHING_DURATION: u128 = 1_000_000;
 //pub enum CareerType {
 //	HardwareDruid = 0,
 //	RoboWarrior = 1,
-//	NegotiateTrade = 2,
+//	TradeNegotiator = 2,
 //	HackerWizard = 3,
 //	Web3Monk = 4,
 //}
@@ -81,21 +91,22 @@ pub mod pallet {
 	use frame_system::pallet_prelude::*;
 	use sp_runtime::traits::StaticLookup;
 	use rmrk_traits::Nft;
-	use rmrk_traits::primitives::{CollectionId, NftId, SerialId};
-	use crate::{CareerType, EggType, RaceType};
+	use rmrk_traits::primitives::{CollectionId, NftId, SerialId, EggType, CareerType, RaceType};
 
 	type BalanceOf<T> =
 		<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
+	// type EggInfoOf<T> = EggInfo<SerialId, CollectionId, NftId>;
 
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
-	pub trait Config: frame_system::Config + pallet_rmrk_core::Config {
+	pub trait Config: frame_system::Config + pallet_rmrk_core::Config + pallet_rmrk_market::Config {
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
 		/// The origin which may forcibly buy, sell, list/unlist, offer & withdraw offer on Tokens
 		type ProtocolOrigin: EnsureOrigin<Self::Origin>;
 		/// The market currency mechanism.
 		type Currency: Currency<Self::AccountId>;
+		// TODO: Switch Storage Values below to configurable Constants
 	}
 
 	#[pallet::pallet]
@@ -112,6 +123,23 @@ pub mod pallet {
 	#[pallet::getter(fn claimed_eggs)]
 	pub type ClaimedEggs<T: Config> = StorageMap<_, Twox64Concat, SerialId, bool>;
 
+	// TODO: Preorder info for Accounts
+	// #[pallet::storage]
+	// #[pallet::getter(fn preorders)]
+	// pub type Preorders<T: Config> = StorageMap<_, Twox64Concat, AccountId, (RaceType, CareerType)>;
+
+	/// Stores all the Eggs and the information about the Egg pertaining to Hatch times and feeding
+	#[pallet::storage]
+	#[pallet::getter(fn eggs)]
+	pub type Eggs<T: Config> = StorageDoubleMap<
+		_,
+		Blake2_128Concat,
+		CollectionId,
+		Blake2_128Concat,
+		NftId,
+		EggInfo<CollectionId, NftId>,
+	>;
+
 	/// Food per Owner where an owner gets 5 food per era
 	#[pallet::storage]
 	#[pallet::getter(fn get_food_by_owner)]
@@ -127,6 +155,21 @@ pub mod pallet {
 	#[pallet::getter(fn game_overlord)]
 	pub(super) type GameOverlord<T:Config> = StorageValue<_, T::AccountId, OptionQuery>;
 
+	/// Spirits can be claimed
+	#[pallet::storage]
+	#[pallet::getter(fn can_claim_spirits)]
+	pub type CanClaimSpirits<T:Config> = StorageValue<_, bool, ValueQuery>;
+
+	/// Rare Eggs can be purchased
+	#[pallet::storage]
+	#[pallet::getter(fn can_purchase_rare_eggs)]
+	pub type CanPurchaseRareEggs<T:Config> = StorageValue<_, bool, ValueQuery>;
+
+	/// Eggs can be preordered
+	#[pallet::storage]
+	#[pallet::getter(fn can_preorder_eggs)]
+	pub type CanPreorderEggs<T:Config> = StorageValue<_, bool, ValueQuery>;
+
 	// The pallet's runtime storage items.
 	#[pallet::storage]
 	#[pallet::getter(fn something)]
@@ -138,6 +181,12 @@ pub mod pallet {
 		pub game_overlord: Option<T::AccountId>,
 		/// `BlockNumber` of Phala World Zero Day
 		pub zero_day: Option<T::BlockNumber>,
+		/// bool for if a Spirit is claimable
+		pub can_claim_spirits: bool,
+		/// bool for if a Rare Egg can be purchased
+		pub can_purchase_rare_eggs: bool,
+		/// bool for if an Egg can be preordered
+		pub can_preorder_eggs: bool,
 	}
 
 	#[cfg(feature = "std")]
@@ -146,6 +195,9 @@ pub mod pallet {
 			Self {
 				game_overlord: None,
 				zero_day: None,
+				can_claim_spirits: false,
+				can_purchase_rare_eggs: false,
+				can_preorder_eggs: false,
 			}
 		}
 	}
@@ -159,6 +211,12 @@ pub mod pallet {
 			if let Some(ref zero_day) = self.zero_day {
 				ZeroDay::<T>::put(zero_day);
 			}
+			let can_claim_spirits = self.can_claim_spirits;
+			CanClaimSpirits::<T>::put(can_claim_spirits);
+			let can_purchase_rare_eggs = self.can_purchase_rare_eggs;
+			CanPurchaseRareEggs::<T>::put(can_purchase_rare_eggs);
+			let can_preorder_eggs = self.can_preorder_eggs;
+			CanPreorderEggs::<T>::put(can_preorder_eggs);
 		}
 	}
 
@@ -177,8 +235,7 @@ pub mod pallet {
 		},
 		/// Spirit has been claimed from the whitelist
 		SpiritClaimed {
-			collection_id: CollectionId,
-			nft_id: NftId,
+			serial_id: SerialId,
 			owner: T::AccountId,
 		},
 		/// Founder egg has been purchased
@@ -263,9 +320,12 @@ pub mod pallet {
 		WorldClockAlreadySet,
 		AccountNotInWhitelist,
 		NoClaimAvailable,
+		RareEggPurchaseNotAvailable,
+		PreorderEggNotAvailable,
 		SpiritAlreadyClaimed,
 		ClaimIsOver,
 		InsufficientFunds,
+		InvalidPurchase,
 		InvalidClaimTicket,
 		CannotHatchEgg,
 		CannotSendFoodToEgg,
@@ -301,7 +361,20 @@ pub mod pallet {
 			signature: BoundedVec<u8, T::StringLimit>, // TODO: change to Signature
 			metadata: BoundedVec<u8, T::StringLimit>,
 		) -> DispatchResult {
+			// TODO : ensure!(CanClaimSpirits::<T>::get(), Error::<T>::ClaimIsOver);
 			let sender = ensure_signed(origin)?;
+
+			// TODO: Check if valid SerialId to claim a spirit
+
+			// Has the SerialId already been claimed
+			ensure!(!ClaimedSpirits::<T>::contains_key(serial_id), Error::<T>::SpiritAlreadyClaimed);
+			// TODO: Mint new Spirit with unique metadata
+
+			ClaimedSpirits::<T>::insert(serial_id, true);
+			Self::deposit_event(Event::SpiritClaimed{
+				serial_id,
+				owner: sender,
+			});
 
 			Ok(())
 		}
@@ -322,7 +395,22 @@ pub mod pallet {
 			race: RaceType,
 			career: CareerType,
 		) -> DispatchResult {
+			ensure!(CanPurchaseRareEggs::<T>::get(), Error::<T>::RareEggPurchaseNotAvailable);
 			let sender = ensure_signed(origin)?;
+			// TODO: Ensure sender has a Spirit before purchasing an Egg
+			// Do we want to iterate through owned NFTs for a Spirit NFT since this won't be a highly
+			// used function?
+			let egg_price = match egg_type {
+				2 => {
+					FOUNDER_EGG_PRICE
+				},
+				1 => {
+					LEGENDARY_EGG_PRICE
+				},
+				_ => 0,
+			};
+			ensure!(egg_price != 0, Error::<T>::InvalidPurchase);
+			// Transfer the amount for the rare Egg NFT then mint the egg
 
 			Ok(())
 		}
@@ -343,6 +431,7 @@ pub mod pallet {
 			race: RaceType,
 			career: CareerType,
 		) -> DispatchResult {
+			ensure!(CanPreorderEggs::<T>::get(), Error::<T>::PreorderEggNotAvailable);
 			let sender = ensure_signed(origin)?;
 
 			Ok(())

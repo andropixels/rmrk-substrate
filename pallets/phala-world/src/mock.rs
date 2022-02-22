@@ -32,6 +32,7 @@ frame_support::construct_runtime!(
 		Uniques: pallet_uniques::{Pallet, Storage, Event<T>},
 		RmrkCore: pallet_rmrk_core::{Pallet, Call, Event<T>},
 		Balances: pallet_balances::{Pallet, Call, Storage, Event<T>},
+		RmrkMarket: pallet_rmrk_market::{Pallet, Call, Event<T>},
 		PhalaWorld: pallet_phala_world::{Pallet, Call, Storage, Event<T>},
 	}
 );
@@ -128,13 +129,26 @@ impl pallet_uniques::Config for Test {
 	// type InstanceReserveStrategy = NFT;
 }
 
+parameter_types! {
+	pub const MinimumOfferAmount: Balance = 50 * UNITS;
+}
+
+impl pallet_rmrk_market::Config for Test {
+	type Event = Event;
+	type ProtocolOrigin = EnsureRoot<AccountId>;
+	type Currency = Balances;
+	type MinimumOfferAmount = MinimumOfferAmount;
+}
+
 impl Config for Test {
 	type Event = Event;
 	type ProtocolOrigin = EnsureRoot<AccountId>;
 	type Currency = Balances;
 }
 
+pub const ALICE: AccountId = AccountId::new([1u8; 32]);
 pub const RMRK: Balance = 1;
+pub const UNITS: Balance = 100_000_000_000;
 
 // Build genesis storage according to the mock runtime.
 pub fn new_test_ext() -> sp_io::TestExternalities {

@@ -7,11 +7,76 @@ use crate::primitives::*;
 use serde::{Deserialize, Serialize};
 use sp_std::result::Result;
 
-#[derive(Encode, Decode, Eq, Copy, PartialEq, Clone, RuntimeDebug, TypeInfo)]
+// Egg Types of Normal, Legendary & Founder
+// #[derive(Encode, Decode, Clone, PartialEq, TypeInfo)]
+// pub enum EggType {
+// 	Normal = 0,
+// 	Legendary = 1,
+// 	Founder = 2,
+// }
+//
+// impl Default for EggType {
+// 	fn default() -> Self {
+// 		EggType::Normal
+// 	}
+// }
+//
+// impl EggType {
+// 	pub fn from_u8(value: u8) -> EggType {
+// 		match value {
+// 			0 => EggType::Normal,
+// 			1 => EggType::Legendary,
+// 			2 => EggType::Founder,
+// 			_ => EggType::Normal,
+// 		}
+// 	}
+// }
+//
+// // Four Races to choose from
+// #[derive(Encode, Decode, Clone, PartialEq, TypeInfo)]
+// pub enum RaceType {
+// 	Cyborg = 0,
+// 	AI = 1,
+// 	Devil = 2,
+// 	Robot = 3,
+// }
+//
+// impl RaceType {
+//     pub fn from_u8(value: u8) -> RaceType {
+//         match value {
+//             0 => RaceType::Cyborg,
+//             1 => RaceType::AI,
+//             2 => RaceType::Devil,
+//             3 => RaceType::Robot,
+//         }
+//     }
+// }
+//
+// // Five Careers to choose from
+// #[derive(Encode, Decode, Clone, PartialEq, TypeInfo)]
+// pub enum CareerType {
+// 	HardwareDruid = 0,
+// 	RoboWarrior = 1,
+// 	TradeNegotiator = 2,
+// 	HackerWizard = 3,
+// 	Web3Monk = 4,
+// }
+//
+// impl CareerType {
+//     pub fn from_u8(value: u8) -> CareerType {
+//         match value {
+//             0 => CareerType::HardwareDruid,
+//             1 => CareerType::RoboWarrior,
+//             2 => CareerType::TradeNegotiator,
+//             3 => CareerType::HackerWizard,
+//             4 => CareerType::Web3Monk,
+//         }
+//     }
+// }
+
+#[derive(Encode, Decode, Eq, PartialEq, Clone, RuntimeDebug, TypeInfo)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
-pub struct EggInfo<SerialId, CollectionId, NftId> {
-    /// Egg id of the Egg RMRK NFT
-    pub egg_id: SerialId,
+pub struct EggInfo<CollectionId, NftId> {
     /// Egg type of the Egg RMRK NFT
     pub egg_type: EggType,
     /// Collection id of the Egg RMRK NFT
@@ -19,9 +84,9 @@ pub struct EggInfo<SerialId, CollectionId, NftId> {
     /// NFT id of the Egg RMRK NFT
     pub nft_id: NftId,
     /// Race type of the Egg RMRK NFT
-    pub race: u8,
+    pub race: RaceType,
     /// Career type of the Egg RMRK NFT
-    pub career: u8,
+    pub career: CareerType,
     /// Block number when the Egg started hatching process
     pub start_hatching: u64,
     /// Time duration from `start_hatching` to when the Egg is ready to hatch

@@ -12,7 +12,7 @@ pub use nft::{AccountIdOrCollectionNftTuple, Nft, NftInfo};
 pub use priority::Priority;
 pub use property::Property;
 pub use resource::{Resource, ResourceInfo};
-pub use egg::EggInfo;
+pub use egg::{Egg, EggInfo};
 
 pub mod primitives {
 	pub type CollectionId = u32;
