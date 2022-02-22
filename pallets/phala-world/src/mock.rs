@@ -1,14 +1,9 @@
 use super::*;
 use crate as pallet_phala_world;
 
-use frame_support::{
-	construct_runtime,
-	parameter_types,
-	traits::{ConstU32, Everything},
-	weights::Weight,
-};
+use frame_support::{construct_runtime, parameter_types, traits::{ConstU32, Everything}, weights::Weight};
 use frame_system as system;
-use frame_system::{ EnsureRoot };
+use frame_system::{EnsureRoot};
 use sp_core::{crypto::AccountId32, H256};
 
 use sp_runtime::{
@@ -20,6 +15,7 @@ type AccountId = AccountId32;
 type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
 type Block = frame_system::mocking::MockBlock<Test>;
 type Balance = u128;
+type BlockNumber = u64;
 
 // Configure a mock runtime to test the pallet.
 frame_support::construct_runtime!(
@@ -140,17 +136,53 @@ impl pallet_rmrk_market::Config for Test {
 	type MinimumOfferAmount = MinimumOfferAmount;
 }
 
+parameter_types! {
+	pub const BlocksPerEra: BlockNumber = 5;
+}
+
 impl Config for Test {
 	type Event = Event;
-	type ProtocolOrigin = EnsureRoot<AccountId>;
+	type GameOverlordOrigin = EnsureRoot<AccountId>;
 	type Currency = Balances;
+	type BlocksPerEra = BlocksPerEra;
 }
 
 pub const ALICE: AccountId = AccountId::new([1u8; 32]);
+pub const BOB: AccountId = AccountId::new([2u8; 32]);
+pub const CHARLIE: AccountId = AccountId::new([3u8; 32]);
 pub const RMRK: Balance = 1;
 pub const UNITS: Balance = 100_000_000_000;
 
+pub const MILLISECS_PER_BLOCK: u64 = 3_000;
+// Time is measured by number of blocks.
+pub const MINUTES: BlockNumber = 60_000 / (MILLISECS_PER_BLOCK as BlockNumber);
+pub const HOURS: BlockNumber = MINUTES * 60;
+pub const DAYS: BlockNumber = HOURS * 24;
+
+pub struct ExtBuilder;
+
+impl Default for ExtBuilder {
+	fn default() -> Self {
+		ExtBuilder
+	}
+}
 // Build genesis storage according to the mock runtime.
-pub fn new_test_ext() -> sp_io::TestExternalities {
-	system::GenesisConfig::default().build_storage::<Test>().unwrap().into()
+impl ExtBuilder {
+	pub fn build(self) -> sp_io::TestExternalities {
+		let mut t = frame_system::GenesisConfig::default().build_storage::<Test>().unwrap();
+
+		pallet_balances::GenesisConfig::<Test> {
+			balances: vec![
+				(ALICE, 20_000_000 * RMRK),
+				(BOB, 15_000 * RMRK),
+				(CHARLIE, 150_000 * RMRK),
+			],
+		}
+			.assimilate_storage(&mut t)
+			.unwrap();
+
+		let mut ext = sp_io::TestExternalities::new(t);
+		ext.execute_with(|| System::set_block_number(1));
+		ext
+	}
 }

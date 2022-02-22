@@ -313,10 +313,14 @@ impl pallet_rmrk_core::Config for Runtime {
 	type MaxRecursions = MaxRecursions;
 }
 
+parameter_types! {
+    pub const BlocksPerEra: BlockNumber = DAYS;
+}
 impl pallet_phala_world::Config for Runtime {
 	type Event = Event;
-	type ProtocolOrigin = frame_system::EnsureRoot<AccountId>;
+	type GameOverlordOrigin = frame_system::EnsureRoot<AccountId>;
 	type Currency = Balances;
+	type BlocksPerEra = BlocksPerEra;
 }
 
 parameter_types! {

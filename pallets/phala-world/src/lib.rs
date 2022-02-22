@@ -29,7 +29,7 @@ mod benchmarking;
 pub use pallet::*;
 
 /// Constant for amount of time it takes for an Egg to hatch after hatching is started
-pub const HATCHING_DURATION: u128 = 1_000_000;
+pub const HATCHING_DURATION: u64 = 1_000_000;
 /// Constant for Collection ID for Eggs
 pub const EGGS_COLLECTION_ID: u32 = 0;
 /// Constant for Founder Eggs Price
@@ -90,6 +90,7 @@ pub mod pallet {
 	use frame_support::{dispatch::DispatchResult, pallet_prelude::*};
 	use frame_system::pallet_prelude::*;
 	use sp_runtime::traits::StaticLookup;
+	use frame_support::sp_runtime::traits::Zero;
 	use rmrk_traits::Nft;
 	use rmrk_traits::primitives::{CollectionId, NftId, SerialId, EggType, CareerType, RaceType};
 
@@ -103,10 +104,13 @@ pub mod pallet {
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
 		/// The origin which may forcibly buy, sell, list/unlist, offer & withdraw offer on Tokens
-		type ProtocolOrigin: EnsureOrigin<Self::Origin>;
+		type GameOverlordOrigin: EnsureOrigin<Self::Origin>;
 		/// The market currency mechanism.
 		type Currency: Currency<Self::AccountId>;
 		// TODO: Switch Storage Values below to configurable Constants
+		/// Block per Era that will increment the Era storage value every interval
+		#[pallet::constant]
+		type BlocksPerEra: Get<Self::BlockNumber>;
 	}
 
 	#[pallet::pallet]
@@ -150,10 +154,10 @@ pub mod pallet {
 	#[pallet::getter(fn zero_day)]
 	pub(super) type ZeroDay<T:Config> = StorageValue<_, T::BlockNumber, OptionQuery>;
 
-	/// Game Overlord account that functions as an Admin
+	/// The current Era from the initial ZeroDay BlockNumber
 	#[pallet::storage]
-	#[pallet::getter(fn game_overlord)]
-	pub(super) type GameOverlord<T:Config> = StorageValue<_, T::AccountId, OptionQuery>;
+	#[pallet::getter(fn era)]
+	pub(super) type Era<T:Config> = StorageValue<_, u64, ValueQuery>;
 
 	/// Spirits can be claimed
 	#[pallet::storage]
@@ -175,10 +179,24 @@ pub mod pallet {
 	#[pallet::getter(fn something)]
 	pub type Something<T> = StorageValue<_, u32>;
 
+	#[pallet::hooks]
+	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
+		fn on_finalize(n: T::BlockNumber) {
+			if <ZeroDay<T>>::get().is_some() &&
+				(n % T::BlocksPerEra::get()).is_zero() {
+				let mut current_era = <Era<T>>::get();
+				current_era = current_era.saturating_add(1u64);
+				<Era<T>>::put(current_era);
+				Self::deposit_event(Event::NewEra{
+					time: n,
+					era: current_era,
+				});
+			}
+		}
+	}
+
 	#[pallet::genesis_config]
 	pub struct GenesisConfig<T: Config> {
-		/// The `AccountId` of the GameOverlord
-		pub game_overlord: Option<T::AccountId>,
 		/// `BlockNumber` of Phala World Zero Day
 		pub zero_day: Option<T::BlockNumber>,
 		/// bool for if a Spirit is claimable
@@ -193,7 +211,6 @@ pub mod pallet {
 	impl<T: Config> Default for GenesisConfig<T> {
 		fn default() -> Self {
 			Self {
-				game_overlord: None,
 				zero_day: None,
 				can_claim_spirits: false,
 				can_purchase_rare_eggs: false,
@@ -205,9 +222,6 @@ pub mod pallet {
 	#[pallet::genesis_build]
 	impl<T: Config> GenesisBuild<T> for GenesisConfig<T> {
 		fn build(&self) {
-			if let Some(ref game_overlord) = self.game_overlord {
-				GameOverlord::<T>::put(game_overlord);
-			}
 			if let Some(ref zero_day) = self.zero_day {
 				ZeroDay::<T>::put(zero_day);
 			}
@@ -231,7 +245,7 @@ pub mod pallet {
 		/// Start of a new era
 		NewEra {
 			time: T::BlockNumber,
-			era: u128,
+			era: u64,
 		},
 		/// Spirit has been claimed from the whitelist
 		SpiritClaimed {
@@ -304,10 +318,6 @@ pub mod pallet {
 		EggHatchingDisabled {
 			collection_id: CollectionId,
 			can_hatch: bool,
-		},
-		/// Change to a new GameOverlord from the \[old_game_overlord\]
-		GameOverlordChanged {
-			old_game_overlord: Option<T::AccountId>,
 		},
 		/// Event documentation should end with an array that provides descriptive names for event
 		/// parameters. [something, who]
@@ -446,7 +456,8 @@ pub mod pallet {
 			origin: OriginFor<T>,
 			egg_owners: Vec<SerialId>,
 		) -> DispatchResult {
-			let sender = ensure_signed(origin)?;
+			// Ensure GameOverlordOrigin makes call
+			T::GameOverlordOrigin::ensure_origin(origin)?;
 
 			Ok(())
 		}
@@ -544,7 +555,8 @@ pub mod pallet {
 			nft_id: NftId,
 			reduced_time: u64,
 		) -> DispatchResult {
-			let sender = ensure_signed(origin)?;
+			// Ensure GameOverlordOrigin makes call
+			T::GameOverlordOrigin::ensure_origin(origin)?;
 
 			Ok(())
 		}
@@ -567,43 +579,17 @@ pub mod pallet {
 			Ok(())
 		}
 
-		/// Authenticates the current sudo key and sets the given AccountId (`new`) as the new sudo
-		/// key.
-		///
-		/// Parameters:
-		/// - `origin`: Executed by root origin to assign the `GameOverlord`
-		/// - `new_game_overlord`: The Account to be decalred the `GameOverlord` and act as an Admin to
-		/// Phala World
-		#[pallet::weight(0)]
-		pub fn set_game_overlord(
-			origin: OriginFor<T>,
-			new_game_overlord: <T::Lookup as StaticLookup>::Source,
-		) -> DispatchResultWithPostInfo {
-			// This is a public call, so we ensure that the origin is some signed account.
-			let sender = ensure_signed(origin)?;
-			ensure!(Self::game_overlord().map_or(false, |k| sender == k), Error::<T>::NoPermission);
-			let new_game_overlord = T::Lookup::lookup(new_game_overlord)?;
-
-			Self::deposit_event(Event::GameOverlordChanged {
-				old_game_overlord: GameOverlord::<T>::get()
-			});
-
-			GameOverlord::<T>::put(&new_game_overlord);
-			// GameOverlord user does not pay a fee
-			Ok(Pays::No.into())
-		}
-
 		/// Phala World Zero Day is set to begin the tracking of the official time starting at the
 		/// current block when `initialize_world_clock` is called by the `GameOverlord`
 		///
 		/// Parameters:
-		/// `origin`: Expected to be called by the `GameOverlord`
+		/// `origin`: Expected to be called by `GameOverlordOrigin`
 		#[pallet::weight(0)]
 		pub fn initialize_world_clock(
 			origin: OriginFor<T>,
 		) -> DispatchResultWithPostInfo {
-			let sender = ensure_signed(origin)?;
-			ensure!(Self::game_overlord().map_or(false, |k| sender == k), Error::<T>::NoPermission);
+			// Ensure GameOverlordOrigin makes call
+			T::GameOverlordOrigin::ensure_origin(origin)?;
 			// Ensure ZeroDay is None as this can only be set once
 			ensure!(Self::zero_day() == None, Error::<T>::WorldClockAlreadySet);
 
