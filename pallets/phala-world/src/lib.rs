@@ -319,6 +319,18 @@ pub mod pallet {
 			collection_id: CollectionId,
 			can_hatch: bool,
 		},
+		/// Spirit Claims status has changed
+		ClaimSpiritStatusChanged {
+			status: bool,
+		},
+		/// Purchase Rare Eggs status has changed
+		PurchaseRareEggsStatusChanged {
+			status: bool,
+		},
+		/// Preorder Eggs status has changed
+		PreorderEggsStatusChanged {
+			status: bool,
+		},
 		/// Event documentation should end with an array that provides descriptive names for event
 		/// parameters. [something, who]
 		SomethingStored(u32, T::AccountId),
@@ -371,7 +383,7 @@ pub mod pallet {
 			signature: BoundedVec<u8, T::StringLimit>, // TODO: change to Signature
 			metadata: BoundedVec<u8, T::StringLimit>,
 		) -> DispatchResult {
-			// TODO : ensure!(CanClaimSpirits::<T>::get(), Error::<T>::ClaimIsOver);
+			ensure!(CanClaimSpirits::<T>::get(), Error::<T>::ClaimIsOver);
 			let sender = ensure_signed(origin)?;
 
 			// TODO: Check if valid SerialId to claim a spirit
@@ -561,24 +573,6 @@ pub mod pallet {
 			Ok(())
 		}
 
-		/// An example dispatchable that takes a singles value as a parameter, writes the value to
-		/// storage and emits an event. This function must be dispatched by a signed extrinsic.
-		#[pallet::weight(10_000 + T::DbWeight::get().writes(1))]
-		pub fn do_something(origin: OriginFor<T>, something: u32) -> DispatchResult {
-			// Check that the extrinsic was signed and get the signer.
-			// This function will return an error if the extrinsic is not signed.
-			// https://docs.substrate.io/v3/runtime/origins
-			let who = ensure_signed(origin)?;
-
-			// Update storage.
-			<Something<T>>::put(something);
-
-			// Emit an event.
-			Self::deposit_event(Event::SomethingStored(something, who));
-			// Return a successful DispatchResultWithPostInfo
-			Ok(())
-		}
-
 		/// Phala World Zero Day is set to begin the tracking of the official time starting at the
 		/// current block when `initialize_world_clock` is called by the `GameOverlord`
 		///
@@ -603,23 +597,70 @@ pub mod pallet {
 			Ok(Pays::No.into())
 		}
 
-		/// An example dispatchable that may throw a custom error.
-		#[pallet::weight(10_000 + T::DbWeight::get().reads_writes(1,1))]
-		pub fn cause_error(origin: OriginFor<T>) -> DispatchResult {
-			let _who = ensure_signed(origin)?;
+		// TODO: Change the following to helper functions and create a flip status function to
+		// the appropriate function
 
-			// Read a value from storage.
-			match <Something<T>>::get() {
-				// Return an error if the value has not been set.
-				None => Err(Error::<T>::NoneValue.into()),
-				Some(old) => {
-					// Increment the value read from storage; will error in the event of overflow.
-					let new = old.checked_add(1).ok_or(Error::<T>::StorageOverflow)?;
-					// Update the value in storage with the incremented result.
-					<Something<T>>::put(new);
-					Ok(())
-				},
-			}
+		/// Enable Spirit Claims with the GameOverlordOrigin Account to allow users to claim their
+		/// Spirits through the `claim_spirits()` function
+		///
+		/// Parameters:
+		/// `origin`: Expected to be called by `GameOverlordOrigin`
+		#[pallet::weight(0)]
+		pub fn flip_claim_spirits_status(
+			origin: OriginFor<T>,
+		) -> DispatchResultWithPostInfo {
+			// Ensure GameOverlordOrigin makes call
+			T::GameOverlordOrigin::ensure_origin(origin)?;
+			let claim_spirit_status = <CanClaimSpirits<T>>::get();
+			<CanClaimSpirits<T>>::put(!claim_spirit_status);
+
+			Self::deposit_event(Event::ClaimSpiritStatusChanged {
+				status: !claim_spirit_status,
+			});
+
+			Ok(Pays::No.into())
+		}
+
+		/// Flip Rare Eggs status for purchase with the GameOverlordOrigin Account to allow
+		/// users to claim their Spirits through the `claim_spirits()` function
+		///
+		/// Parameters:
+		/// `origin`: Expected to be called by `GameOverlordOrigin`
+		#[pallet::weight(0)]
+		pub fn flip_purchase_rare_eggs_status(
+			origin: OriginFor<T>,
+		) -> DispatchResultWithPostInfo {
+			// Ensure GameOverlordOrigin makes call
+			T::GameOverlordOrigin::ensure_origin(origin)?;
+			let purchase_rare_eggs_status = <CanPurchaseRareEggs<T>>::get();
+			<CanPurchaseRareEggs<T>>::put(!purchase_rare_eggs_status);
+
+			Self::deposit_event(Event::PurchaseRareEggsStatusChanged {
+				status: !purchase_rare_eggs_status,
+			});
+
+			Ok(Pays::No.into())
+		}
+
+		/// Flip status of Preordering eggs with the GameOverlordOrigin Account to allow
+		/// users to preorder eggs through the `preorder_egg()` function
+		///
+		/// Parameters:
+		/// `origin`: Expected to be called by `GameOverlordOrigin`
+		#[pallet::weight(0)]
+		pub fn flip_preorder_eggs_status(
+			origin: OriginFor<T>,
+		) -> DispatchResultWithPostInfo {
+			// Ensure GameOverlordOrigin makes call
+			T::GameOverlordOrigin::ensure_origin(origin)?;
+			let preorder_eggs_status = <CanPreorderEggs<T>>::get();
+			<CanPreorderEggs<T>>::put(!preorder_eggs_status);
+
+			Self::deposit_event(Event::PreorderEggsStatusChanged {
+				status: !preorder_eggs_status,
+			});
+
+			Ok(Pays::No.into())
 		}
 	}
 }
