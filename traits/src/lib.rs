@@ -6,6 +6,7 @@ pub mod priority;
 pub mod property;
 pub mod resource;
 pub mod egg;
+pub mod preorders;
 
 pub use collection::{Collection, CollectionInfo};
 pub use nft::{AccountIdOrCollectionNftTuple, Nft, NftInfo};
@@ -13,6 +14,7 @@ pub use priority::Priority;
 pub use property::Property;
 pub use resource::{Resource, ResourceInfo};
 pub use egg::{Egg, EggInfo};
+pub use preorders::PreorderInfo;
 
 pub mod primitives {
 	pub type CollectionId = u32;

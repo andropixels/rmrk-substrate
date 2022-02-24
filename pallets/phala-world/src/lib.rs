@@ -14,6 +14,7 @@ pub use pallet_rmrk_market;
 
 use rmrk_traits::{
 	EggInfo,
+	PreorderInfo,
 	primitives::*,
 };
 
@@ -96,7 +97,7 @@ pub mod pallet {
 
 	type BalanceOf<T> =
 		<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
-	// type EggInfoOf<T> = EggInfo<SerialId, CollectionId, NftId>;
+	type PreorderInfoOf<T> = PreorderInfo<<T as frame_system::Config>::AccountId>;
 
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
@@ -127,10 +128,10 @@ pub mod pallet {
 	#[pallet::getter(fn claimed_eggs)]
 	pub type ClaimedEggs<T: Config> = StorageMap<_, Twox64Concat, SerialId, bool>;
 
-	// TODO: Preorder info for Accounts
-	// #[pallet::storage]
-	// #[pallet::getter(fn preorders)]
-	// pub type Preorders<T: Config> = StorageMap<_, Twox64Concat, AccountId, (RaceType, CareerType)>;
+	/// Preorder info vector for Accounts
+	#[pallet::storage]
+	#[pallet::getter(fn preorders)]
+	pub type Preorders<T: Config> = StorageValue<_, Vec<PreorderInfoOf<T>>, ValueQuery>;
 
 	/// Stores all the Eggs and the information about the Egg pertaining to Hatch times and feeding
 	#[pallet::storage]
@@ -466,7 +467,6 @@ pub mod pallet {
 		#[transactional]
 		pub fn mint_eggs(
 			origin: OriginFor<T>,
-			egg_owners: Vec<SerialId>,
 		) -> DispatchResult {
 			// Ensure GameOverlordOrigin makes call
 			T::GameOverlordOrigin::ensure_origin(origin)?;
