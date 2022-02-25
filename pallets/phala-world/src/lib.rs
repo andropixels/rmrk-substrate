@@ -108,7 +108,6 @@ pub mod pallet {
 		type GameOverlordOrigin: EnsureOrigin<Self::Origin>;
 		/// The market currency mechanism.
 		type Currency: Currency<Self::AccountId>;
-		// TODO: Switch Storage Values below to configurable Constants
 		/// Block per Era that will increment the Era storage value every interval
 		#[pallet::constant]
 		type BlocksPerEra: Get<Self::BlockNumber>;
@@ -158,7 +157,7 @@ pub mod pallet {
 	/// The current Era from the initial ZeroDay BlockNumber
 	#[pallet::storage]
 	#[pallet::getter(fn era)]
-	pub(super) type Era<T:Config> = StorageValue<_, u64, ValueQuery>;
+	pub type Era<T:Config> = StorageValue<_, u64, ValueQuery>;
 
 	/// Spirits can be claimed
 	#[pallet::storage]
@@ -183,15 +182,17 @@ pub mod pallet {
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
 		fn on_finalize(n: T::BlockNumber) {
-			if <ZeroDay<T>>::get().is_some() &&
-				(n % T::BlocksPerEra::get()).is_zero() {
-				let mut current_era = <Era<T>>::get();
-				current_era = current_era.saturating_add(1u64);
-				<Era<T>>::put(current_era);
-				Self::deposit_event(Event::NewEra{
-					time: n,
-					era: current_era,
-				});
+			if let Some(zero_day) = <ZeroDay<T>>::get() {
+				let blocks_since_zero_day = n - zero_day;
+				if (blocks_since_zero_day % T::BlocksPerEra::get()).is_zero() {
+					let mut current_era = <Era<T>>::get();
+					current_era = current_era.saturating_add(1u64);
+					<Era<T>>::put(current_era);
+					Self::deposit_event(Event::NewEra{
+						time: n,
+						era: current_era,
+					});
+				}
 			}
 		}
 	}
@@ -200,6 +201,8 @@ pub mod pallet {
 	pub struct GenesisConfig<T: Config> {
 		/// `BlockNumber` of Phala World Zero Day
 		pub zero_day: Option<T::BlockNumber>,
+		/// Current Era of Phala World
+		pub era: u64,
 		/// bool for if a Spirit is claimable
 		pub can_claim_spirits: bool,
 		/// bool for if a Rare Egg can be purchased
@@ -213,6 +216,7 @@ pub mod pallet {
 		fn default() -> Self {
 			Self {
 				zero_day: None,
+				era: 0,
 				can_claim_spirits: false,
 				can_purchase_rare_eggs: false,
 				can_preorder_eggs: false,
@@ -224,14 +228,16 @@ pub mod pallet {
 	impl<T: Config> GenesisBuild<T> for GenesisConfig<T> {
 		fn build(&self) {
 			if let Some(ref zero_day) = self.zero_day {
-				ZeroDay::<T>::put(zero_day);
+				<ZeroDay<T>>::put(zero_day);
 			}
+			let era = self.era;
+			<Era<T>>::put(era);
 			let can_claim_spirits = self.can_claim_spirits;
-			CanClaimSpirits::<T>::put(can_claim_spirits);
+			<CanClaimSpirits<T>>::put(can_claim_spirits);
 			let can_purchase_rare_eggs = self.can_purchase_rare_eggs;
-			CanPurchaseRareEggs::<T>::put(can_purchase_rare_eggs);
+			<CanPurchaseRareEggs<T>>::put(can_purchase_rare_eggs);
 			let can_preorder_eggs = self.can_preorder_eggs;
-			CanPreorderEggs::<T>::put(can_preorder_eggs);
+			<CanPreorderEggs<T>>::put(can_preorder_eggs);
 		}
 	}
 

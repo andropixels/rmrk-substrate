@@ -1,8 +1,10 @@
 use crate::{mock::*, Error};
-use frame_support::{assert_noop, assert_ok};
+use frame_support::{assert_noop, assert_ok, assert_storage_noop};
 
 use super::*;
-use mock::{Event as MockEvent, *};
+use mock::{
+	Event as MockEvent, ExtBuilder, Balances, BalanceCall, Call, PhalaWorld, Origin, SystemCall, Test,
+};
 
 /// Turns a string into a BoundedVec
 fn stb(s: &str) -> BoundedVec<u8, ValueLimit> {
@@ -17,16 +19,6 @@ fn stbk(s: &str) -> BoundedVec<u8, KeyLimit> {
 /// Turns a string into a Vec
 fn stv(s: &str) -> Vec<u8> {
 	s.as_bytes().to_vec()
-}
-
-fn next_block() {
-	System::set_block_number(System::block_number() + 1);
-}
-
-fn fast_forward_to(n: u64) {
-	while System::block_number() < n {
-		next_block();
-	}
 }
 
 macro_rules! bvec {
@@ -62,5 +54,24 @@ fn start_world_clock_works() {
 	ExtBuilder::default().build().execute_with(|| {
 		// Initialize the Phala World Clock
 		assert_ok!(PhalaWorld::initialize_world_clock(Origin::root()));
+	});
+}
+
+#[test]
+fn auto_increment_era_works() {
+	ExtBuilder::default().build().execute_with(|| {
+		// Initialize the Phala World Clock
+		assert_ok!(PhalaWorld::initialize_world_clock(Origin::root()));
+		// Check Zero Day is Some(1)
+		assert_eq!(PhalaWorld::zero_day(), Some(1));
+		// Go to block 7 that would increment the Era at Block 6
+		fast_forward_to(7);
+		// Check Era is 1
+		assert_eq!(PhalaWorld::era(), 1);
+		// Check if event triggered
+		System::assert_last_event(MockEvent::PhalaWorld(crate::Event::NewEra {
+			time: 6,
+			era: 1,
+		}));
 	});
 }

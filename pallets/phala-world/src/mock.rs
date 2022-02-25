@@ -1,7 +1,12 @@
 use super::*;
 use crate as pallet_phala_world;
 
-use frame_support::{construct_runtime, parameter_types, traits::{ConstU32, Everything}, weights::Weight};
+use frame_support::{
+	construct_runtime,
+	parameter_types,
+	traits::{ConstU32, ConstU64, Everything, OnFinalize, OnInitialize},
+	weights::Weight
+};
 use frame_system as system;
 use frame_system::{EnsureRoot};
 use sp_core::{crypto::AccountId32, H256};
@@ -145,6 +150,17 @@ impl Config for Test {
 	type GameOverlordOrigin = EnsureRoot<AccountId>;
 	type Currency = Balances;
 	type BlocksPerEra = BlocksPerEra;
+}
+
+pub type SystemCall = frame_system::Call<Test>;
+pub type BalanceCall = pallet_balances::Call<Test>;
+
+pub fn fast_forward_to(n: u64) {
+	while System::block_number() < n {
+		System::set_block_number(System::block_number() + 1);
+		System::on_finalize(System::block_number());
+		PhalaWorld::on_finalize(System::block_number());
+	}
 }
 
 pub const ALICE: AccountId = AccountId::new([1u8; 32]);
