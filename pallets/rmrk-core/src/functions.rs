@@ -615,4 +615,11 @@ where
 			Ok(current_id)
 		})
 	}
+
+	pub fn get_nft<AccountId: Codec, BoundedString: Codec>(
+		collection_id: CollectionId,
+		nft_id: NftId
+	) -> Option<NftInfo<T::AccountId, BoundedVec<u8, T::StringLimit>>> {
+		Nfts::<T>::get(collection_id, nft_id)
+	}
 }

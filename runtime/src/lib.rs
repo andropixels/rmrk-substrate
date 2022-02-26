@@ -28,6 +28,7 @@ pub use frame_support::{
 		IdentityFee, Weight,
 	},
 	StorageValue,
+	BoundedVec,
 };
 pub use pallet_balances::Call as BalancesCall;
 pub use pallet_timestamp::Call as TimestampCall;
@@ -536,6 +537,15 @@ impl_runtime_apis! {
 			len: u32,
 		) -> pallet_transaction_payment::FeeDetails<Balance> {
 			TransactionPayment::query_fee_details(uxt, len)
+		}
+	}
+
+	impl pallet_rmrk_runtime_api::RmrkApi<Block, AccountId> for Runtime {
+		fn fetch_nft(
+			collection_id: u32,
+			nft_id: u32
+		) -> Option<RmrkCore::NftInfo<AccountId, BoundedVec<u8, pallet_uniques::Config::StringLimit>>> {
+			RmrkCore::get_nft(collection_id, nft_id)
 		}
 	}
 

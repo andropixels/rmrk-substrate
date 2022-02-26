@@ -1,0 +1,20 @@
+[package]
+name = "pallet-rmrk-runtime-api"
+version = "4.0.0-dev"
+description = "RMRK Runtime API"
+authors = ["RMRK Team"]
+homepage = ""
+edition = "2021"
+license = "Apache-2.0"
+publish = false
+repository = "https://github.com/rmrk-team/rmrk-substrate"
+
+[dependencies]
+sp-api = { version = "4.0.0-dev", default-features = false, git = "https://github.com/paritytech/substrate.git", tag = "monthly-2022-01" }
+pallet-rmrk-core = { default-features = false, version = "4.0.0-dev", path = "../rmrk-core" }
+
+[features]
+default = ["std"]
+std = [
+    "sp-api/std",
+]
