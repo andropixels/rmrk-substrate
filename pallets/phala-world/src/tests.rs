@@ -31,7 +31,7 @@ macro_rules! bvec {
 fn claimed_spirit_works() {
 	ExtBuilder::default().build().execute_with(|| {
 		// Enable spirits to be claimed
-		assert_ok!(PhalaWorld::flip_claim_spirits_status(Origin::root()));
+		assert_ok!(PhalaWorld::set_claim_spirits_status(Origin::root(), true));
 		// Dispatch a claim spirit
 		assert_ok!(PhalaWorld::claim_spirit(Origin::signed(ALICE), 1, bvec![0u8; 20], bvec![0u8; 20]));
 	});
@@ -41,7 +41,7 @@ fn claimed_spirit_works() {
 fn claimed_spirit_twice_fails() {
 	ExtBuilder::default().build().execute_with(|| {
 		// Enable spirits to be claimed
-		assert_ok!(PhalaWorld::flip_claim_spirits_status(Origin::root()));
+		assert_ok!(PhalaWorld::set_claim_spirits_status(Origin::root(), true));
 		// Dispatch a claim spirit
 		assert_ok!(PhalaWorld::claim_spirit(Origin::signed(ALICE), 1, bvec![0u8; 20], bvec![0u8; 20]));
 		// Fail to dispatch a second claim spirit

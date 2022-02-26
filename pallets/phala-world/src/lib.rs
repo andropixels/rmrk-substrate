@@ -606,14 +606,15 @@ pub mod pallet {
 		// TODO: Change the following to helper functions and create a flip status function to
 		// the appropriate function
 
-		/// Enable Spirit Claims with the GameOverlordOrigin Account to allow users to claim their
+		/// Set Spirit Claims with the GameOverlordOrigin Account to allow users to claim their
 		/// Spirits through the `claim_spirits()` function
 		///
 		/// Parameters:
 		/// `origin`: Expected to be called by `GameOverlordOrigin`
 		#[pallet::weight(0)]
-		pub fn flip_claim_spirits_status(
+		pub fn set_claim_spirits_status(
 			origin: OriginFor<T>,
+			status: bool,
 		) -> DispatchResultWithPostInfo {
 			// Ensure GameOverlordOrigin makes call
 			T::GameOverlordOrigin::ensure_origin(origin)?;
@@ -633,8 +634,9 @@ pub mod pallet {
 		/// Parameters:
 		/// `origin`: Expected to be called by `GameOverlordOrigin`
 		#[pallet::weight(0)]
-		pub fn flip_purchase_rare_eggs_status(
+		pub fn set_purchase_rare_eggs_status(
 			origin: OriginFor<T>,
+			status: bool,
 		) -> DispatchResultWithPostInfo {
 			// Ensure GameOverlordOrigin makes call
 			T::GameOverlordOrigin::ensure_origin(origin)?;
@@ -648,14 +650,15 @@ pub mod pallet {
 			Ok(Pays::No.into())
 		}
 
-		/// Flip status of Preordering eggs with the GameOverlordOrigin Account to allow
+		/// Set status of Preordering eggs with the GameOverlordOrigin Account to allow
 		/// users to preorder eggs through the `preorder_egg()` function
 		///
 		/// Parameters:
 		/// `origin`: Expected to be called by `GameOverlordOrigin`
 		#[pallet::weight(0)]
-		pub fn flip_preorder_eggs_status(
+		pub fn set_preorder_eggs_status(
 			origin: OriginFor<T>,
+			status: bool,
 		) -> DispatchResultWithPostInfo {
 			// Ensure GameOverlordOrigin makes call
 			T::GameOverlordOrigin::ensure_origin(origin)?;
