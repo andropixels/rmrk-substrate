@@ -318,7 +318,7 @@ parameter_types! {
 }
 impl pallet_phala_world::Config for Runtime {
 	type Event = Event;
-	type GameOverlordOrigin = frame_system::EnsureRoot<AccountId>;
+	type OverlordOrigin = frame_system::EnsureRoot<AccountId>;
 	type Currency = Balances;
 	type BlocksPerEra = BlocksPerEra;
 }

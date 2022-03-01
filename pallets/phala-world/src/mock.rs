@@ -4,7 +4,7 @@ use crate as pallet_phala_world;
 use frame_support::{
 	construct_runtime,
 	parameter_types,
-	traits::{ConstU32, ConstU64, Everything, OnFinalize, OnInitialize},
+	traits::{ConstU32, ConstU64, Everything, OnFinalize, OnInitialize, GenesisBuild},
 	weights::Weight
 };
 use frame_system as system;
@@ -147,7 +147,7 @@ parameter_types! {
 
 impl Config for Test {
 	type Event = Event;
-	type GameOverlordOrigin = EnsureRoot<AccountId>;
+	type OverlordOrigin = EnsureRoot<AccountId>;
 	type Currency = Balances;
 	type BlocksPerEra = BlocksPerEra;
 }
@@ -184,8 +184,19 @@ impl Default for ExtBuilder {
 }
 // Build genesis storage according to the mock runtime.
 impl ExtBuilder {
-	pub fn build(self) -> sp_io::TestExternalities {
+	pub fn build(self, overlord_key: AccountId32) -> sp_io::TestExternalities {
 		let mut t = frame_system::GenesisConfig::default().build_storage::<Test>().unwrap();
+
+		pallet_phala_world::GenesisConfig::<Test> {
+			zero_day: None,
+			overlord: Some(overlord_key),
+			era: 0,
+			can_claim_spirits: false,
+			can_purchase_rare_eggs: false,
+			can_preorder_eggs: false
+		}
+			.assimilate_storage(&mut t)
+			.unwrap();
 
 		pallet_balances::GenesisConfig::<Test> {
 			balances: vec![

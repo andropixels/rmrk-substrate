@@ -1,5 +1,6 @@
 use crate::{mock::*, Error};
 use frame_support::{assert_noop, assert_ok, assert_storage_noop};
+use sp_core::crypto::AccountId32;
 
 use super::*;
 use mock::{
@@ -27,11 +28,18 @@ macro_rules! bvec {
 	}
 }
 
+fn mint_collection(account: AccountId32) {
+	// Mint Spirits collection
+	RmrkCore::create_collection(Origin::signed(account), bvec![0u8; 20], Some(5), bvec![0u8; 15]);
+}
+
 #[test]
 fn claimed_spirit_works() {
-	ExtBuilder::default().build().execute_with(|| {
+	ExtBuilder::default().build(ALICE).execute_with(|| {
 		// Enable spirits to be claimed
-		assert_ok!(PhalaWorld::set_claim_spirits_status(Origin::root(), true));
+		assert_ok!(PhalaWorld::set_claim_spirits_status(Origin::signed(ALICE), true));
+		// Mint collection with Overlord account ALICE
+		mint_collection(ALICE);
 		// Dispatch a claim spirit
 		assert_ok!(PhalaWorld::claim_spirit(Origin::signed(ALICE), 1, bvec![0u8; 20], bvec![0u8; 20]));
 	});
@@ -39,9 +47,19 @@ fn claimed_spirit_works() {
 
 #[test]
 fn claimed_spirit_twice_fails() {
-	ExtBuilder::default().build().execute_with(|| {
+	ExtBuilder::default().build(ALICE).execute_with(|| {
+		// Set the Overlord Admin account
+		assert_ok!(PhalaWorld::set_overlord(Origin::signed(ALICE), BOB));
+		// Alice can no longer set the Overlord Admin account
+		assert_noop!(PhalaWorld::set_overlord(Origin::signed(ALICE), BOB), Error::<Test>::RequireOverlordAccount);
+		// Last Event Overlord changed from None
+		System::assert_last_event(MockEvent::PhalaWorld(crate::Event::OverlordChanged {
+			old_overlord: Some(ALICE),
+		}));
+		// Mint Spirits collection
+		mint_collection(BOB);
 		// Enable spirits to be claimed
-		assert_ok!(PhalaWorld::set_claim_spirits_status(Origin::root(), true));
+		assert_ok!(PhalaWorld::set_claim_spirits_status(Origin::signed(BOB), true));
 		// Dispatch a claim spirit
 		assert_ok!(PhalaWorld::claim_spirit(Origin::signed(ALICE), 1, bvec![0u8; 20], bvec![0u8; 20]));
 		// Fail to dispatch a second claim spirit
@@ -51,7 +69,7 @@ fn claimed_spirit_twice_fails() {
 
 #[test]
 fn start_world_clock_works() {
-	ExtBuilder::default().build().execute_with(|| {
+	ExtBuilder::default().build(ALICE).execute_with(|| {
 		// Initialize the Phala World Clock
 		assert_ok!(PhalaWorld::initialize_world_clock(Origin::root()));
 	});
@@ -59,7 +77,12 @@ fn start_world_clock_works() {
 
 #[test]
 fn auto_increment_era_works() {
-	ExtBuilder::default().build().execute_with(|| {
+	ExtBuilder::default().build(ALICE).execute_with(|| {
+		// Set Overlord admin as ALICE
+		assert_ok!(PhalaWorld::set_overlord(Origin::signed(ALICE), BOB));
+		System::assert_last_event(MockEvent::PhalaWorld(crate::Event::OverlordChanged {
+			old_overlord: Some(ALICE),
+		}));
 		// Initialize the Phala World Clock
 		assert_ok!(PhalaWorld::initialize_world_clock(Origin::root()));
 		// Check Zero Day is Some(1)

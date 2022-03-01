@@ -1,9 +1,8 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 use frame_support::{
-	dispatch::DispatchResult, ensure, traits::{Currency, tokens::nonfungibles::*}, transactional, BoundedVec,
+	ensure, traits::Currency, transactional, BoundedVec,
 };
-use frame_support::traits::tokens::Balance;
 use frame_system::ensure_signed;
 
 use sp_std::prelude::*;
@@ -29,10 +28,12 @@ mod benchmarking;
 
 pub use pallet::*;
 
+/// Spirit Collection ID
+pub const SPIRIT_COLLECTION_ID: u32 = 0;
+/// Constant for Collection ID for Eggs
+pub const EGGS_COLLECTION_ID: u32 = 1;
 /// Constant for amount of time it takes for an Egg to hatch after hatching is started
 pub const HATCHING_DURATION: u64 = 1_000_000;
-/// Constant for Collection ID for Eggs
-pub const EGGS_COLLECTION_ID: u32 = 0;
 /// Constant for Founder Eggs Price
 pub const FOUNDER_EGG_PRICE: u128 = 1_000_000;
 /// Constant for Legendary Eggs Price
@@ -83,7 +84,32 @@ pub const NORMAL_EGG_PRICE: u128 = 1_000;
 //	HackerWizard = 3,
 //	Web3Monk = 4,
 //}
+pub enum StatusType {
+	ClaimSpirits = 0,
+	PurchaseRareEggs = 1,
+	PreorderEggs = 2,
+}
 
+impl StatusType {
+	pub fn from_u8(value: u8) -> Option<StatusType> {
+		match value {
+			0 => Some(StatusType::ClaimSpirits),
+			1 => Some(StatusType::PurchaseRareEggs),
+			2 => Some(StatusType::PreorderEggs),
+			_ => None,
+		}
+	}
+}
+
+// #[cfg(feature = "std")]
+// use serde::{Deserialize, Serialize};
+//
+// #[cfg_attr(feature = "std", derive(Serialize, Deserialize, PartialEq, Eq))]
+// #[derive(Encode, Decode, RuntimeDebug, TypeInfo, Clone)]
+// pub struct OverlordInfo<AccountId> {
+// 	pub admin: AccountId,
+// 	pub collection_id: u32,
+// }
 
 #[frame_support::pallet]
 pub mod pallet {
@@ -92,12 +118,13 @@ pub mod pallet {
 	use frame_system::pallet_prelude::*;
 	use sp_runtime::traits::StaticLookup;
 	use frame_support::sp_runtime::traits::Zero;
+	use frame_system::Origin;
 	use rmrk_traits::Nft;
-	use rmrk_traits::primitives::{CollectionId, NftId, SerialId, EggType, CareerType, RaceType};
 
 	type BalanceOf<T> =
 		<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
 	type PreorderInfoOf<T> = PreorderInfo<<T as frame_system::Config>::AccountId>;
+	//type OverlordInfoOf<T> = OverlordInfo<<T as frame_system::Config>::AccountId>;
 
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
@@ -105,7 +132,7 @@ pub mod pallet {
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
 		/// The origin which may forcibly buy, sell, list/unlist, offer & withdraw offer on Tokens
-		type GameOverlordOrigin: EnsureOrigin<Self::Origin>;
+		type OverlordOrigin: EnsureOrigin<Self::Origin>;
 		/// The market currency mechanism.
 		type Currency: Currency<Self::AccountId>;
 		/// Block per Era that will increment the Era storage value every interval
@@ -174,10 +201,10 @@ pub mod pallet {
 	#[pallet::getter(fn can_preorder_eggs)]
 	pub type CanPreorderEggs<T:Config> = StorageValue<_, bool, ValueQuery>;
 
-	// The pallet's runtime storage items.
+	/// Overlord Admin account of Phala World
 	#[pallet::storage]
-	#[pallet::getter(fn something)]
-	pub type Something<T> = StorageValue<_, u32>;
+	#[pallet::getter(fn overlord)]
+	pub(super) type Overlord<T:Config> = StorageValue<_, T::AccountId, OptionQuery>;
 
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
@@ -201,6 +228,8 @@ pub mod pallet {
 	pub struct GenesisConfig<T: Config> {
 		/// `BlockNumber` of Phala World Zero Day
 		pub zero_day: Option<T::BlockNumber>,
+		/// Overlord Admin account of Phala World
+		pub overlord: Option<T::AccountId>,
 		/// Current Era of Phala World
 		pub era: u64,
 		/// bool for if a Spirit is claimable
@@ -216,6 +245,7 @@ pub mod pallet {
 		fn default() -> Self {
 			Self {
 				zero_day: None,
+				overlord: None,
 				era: 0,
 				can_claim_spirits: false,
 				can_purchase_rare_eggs: false,
@@ -229,6 +259,9 @@ pub mod pallet {
 		fn build(&self) {
 			if let Some(ref zero_day) = self.zero_day {
 				<ZeroDay<T>>::put(zero_day);
+			}
+			if let Some(ref overlord) = self.overlord {
+				<Overlord<T>>::put(overlord);
 			}
 			let era = self.era;
 			<Era<T>>::put(era);
@@ -338,9 +371,9 @@ pub mod pallet {
 		PreorderEggsStatusChanged {
 			status: bool,
 		},
-		/// Event documentation should end with an array that provides descriptive names for event
-		/// parameters. [something, who]
-		SomethingStored(u32, T::AccountId),
+		OverlordChanged {
+			old_overlord: Option<T::AccountId>,
+		},
 	}
 
 	// Errors inform users that something went wrong.
@@ -361,17 +394,18 @@ pub mod pallet {
 		NoFoodAvailable,
 		NoPermission,
 		CareerAndRaceAlreadyChosen,
-		/// Error names should be descriptive.
-		NoneValue,
-		/// Errors should have helpful documentation associated with them.
-		StorageOverflow,
+		OverlordNotSet,
+		RequireOverlordAccount,
 	}
 
 	// Dispatchable functions allows users to interact with the pallet and invoke state changes.
 	// These functions materialize as "extrinsics", which are often compared to transactions.
 	// Dispatchable functions must be annotated with a weight and must return a DispatchResult.
 	#[pallet::call]
-	impl<T: Config> Pallet<T> {
+	impl<T: Config> Pallet<T>
+		where
+		T: pallet_uniques::Config<ClassId = CollectionId, InstanceId = NftId>,
+	{
 		/// Claim a spirit for users that are on the whitelist. This whitelist will consist of a
 		/// a serial id and an account id that is signed by the admin account. When a user comes
 		/// to claim their spirit, they will provide a serial id & will be validated as an
@@ -380,7 +414,7 @@ pub mod pallet {
 		/// Parameters:
 		/// - origin: The origin of the extrinsic.
 		/// - serial_id: The serial id of the spirit to be claimed.
-		/// - signature: The signature of the account that is claiming the spirit.
+		/// - signature: The signature of the account that is claiming the spirit. //Sr25519Signature
 		/// - metadata: The metadata of the account that is claiming the spirit.
 		#[pallet::weight(10_000 + T::DbWeight::get().reads_writes(1,1))]
 		#[transactional]
@@ -391,21 +425,35 @@ pub mod pallet {
 			metadata: BoundedVec<u8, T::StringLimit>,
 		) -> DispatchResult {
 			ensure!(CanClaimSpirits::<T>::get(), Error::<T>::ClaimIsOver);
-			let sender = ensure_signed(origin)?;
+			let sender = ensure_signed(origin.clone())?;
+			let overlord = <Overlord<T>>::get();
+			match overlord {
+				None => Err(Error::<T>::OverlordNotSet.into()),
+				Some(overlord) => {
+					// Has the SerialId already been claimed
+					ensure!(!ClaimedSpirits::<T>::contains_key(serial_id), Error::<T>::SpiritAlreadyClaimed);
 
-			// TODO: Check if valid SerialId to claim a spirit
+					// TODO: Check if valid SerialId to claim a spirit
 
-			// Has the SerialId already been claimed
-			ensure!(!ClaimedSpirits::<T>::contains_key(serial_id), Error::<T>::SpiritAlreadyClaimed);
-			// TODO: Mint new Spirit with unique metadata
+					// Mint new Spirit and transfer to sender
+					pallet_rmrk_core::Pallet::<T>::mint_nft(
+						Origin::<T>::Signed(overlord).into(),
+						sender.clone(),
+						SPIRIT_COLLECTION_ID,
+						None,
+						None,
+						metadata,
+					)?;
 
-			ClaimedSpirits::<T>::insert(serial_id, true);
-			Self::deposit_event(Event::SpiritClaimed{
-				serial_id,
-				owner: sender,
-			});
+					ClaimedSpirits::<T>::insert(serial_id, true);
+					Self::deposit_event(Event::SpiritClaimed {
+						serial_id,
+						owner: sender,
+					});
 
-			Ok(())
+					Ok(())
+				}
+			}
 		}
 
 		/// Buy a rare egg of either type Legendary or Founder. Both Egg types will have a set
@@ -474,8 +522,8 @@ pub mod pallet {
 		pub fn mint_eggs(
 			origin: OriginFor<T>,
 		) -> DispatchResult {
-			// Ensure GameOverlordOrigin makes call
-			T::GameOverlordOrigin::ensure_origin(origin)?;
+			// Ensure OverlordOrigin makes call
+			T::OverlordOrigin::ensure_origin(origin)?;
 
 			Ok(())
 		}
@@ -573,23 +621,47 @@ pub mod pallet {
 			nft_id: NftId,
 			reduced_time: u64,
 		) -> DispatchResult {
-			// Ensure GameOverlordOrigin makes call
-			T::GameOverlordOrigin::ensure_origin(origin)?;
+			// Ensure OverlordOrigin makes call
+			T::OverlordOrigin::ensure_origin(origin)?;
 
 			Ok(())
 		}
 
-		/// Phala World Zero Day is set to begin the tracking of the official time starting at the
-		/// current block when `initialize_world_clock` is called by the `GameOverlord`
+		/// Priveleged function set the Overlord Admin account of Phala World
 		///
 		/// Parameters:
-		/// `origin`: Expected to be called by `GameOverlordOrigin`
+		/// - origin: Expected to be called by `OverlordOrigin`
+		/// - new_overlord: T::AccountId
+		#[pallet::weight(0)]
+		pub fn set_overlord(
+			origin: OriginFor<T>,
+			new_overlord: <T::Lookup as StaticLookup>::Source,
+		) -> DispatchResultWithPostInfo {
+			// This is a public call, so we ensure that the origin is some signed account.
+			let sender = ensure_signed(origin)?;
+			ensure!(Self::overlord().map_or(false, |k| sender == k), Error::<T>::RequireOverlordAccount);
+			let new_overlord = T::Lookup::lookup(new_overlord)?;
+			let old_overlord = <Overlord<T>>::get();
+
+			Overlord::<T>::put(&new_overlord);
+			Self::deposit_event(Event::OverlordChanged {
+				old_overlord,
+			});
+			// GameOverlord user does not pay a fee
+			Ok(Pays::No.into())
+		}
+
+		/// Phala World Zero Day is set to begin the tracking of the official time starting at the
+		/// current block when `initialize_world_clock` is called by the `Overlord`
+		///
+		/// Parameters:
+		/// `origin`: Expected to be called by `Overlord` admin account
 		#[pallet::weight(0)]
 		pub fn initialize_world_clock(
 			origin: OriginFor<T>,
 		) -> DispatchResultWithPostInfo {
-			// Ensure GameOverlordOrigin makes call
-			T::GameOverlordOrigin::ensure_origin(origin)?;
+			// Ensure Overlord account makes call
+			T::OverlordOrigin::ensure_origin(origin)?;
 			// Ensure ZeroDay is None as this can only be set once
 			ensure!(Self::zero_day() == None, Error::<T>::WorldClockAlreadySet);
 
@@ -603,21 +675,22 @@ pub mod pallet {
 			Ok(Pays::No.into())
 		}
 
-		// TODO: Change the following to helper functions and create a flip status function to
+		// TODO: Change the following to helper functions and create a set status function to
 		// the appropriate function
 
-		/// Set Spirit Claims with the GameOverlordOrigin Account to allow users to claim their
+		/// Set Spirit Claims with the Overlord admin Account to allow users to claim their
 		/// Spirits through the `claim_spirits()` function
 		///
 		/// Parameters:
-		/// `origin`: Expected to be called by `GameOverlordOrigin`
+		/// `origin`: Expected to be called by `Overlord` admin account
 		#[pallet::weight(0)]
 		pub fn set_claim_spirits_status(
 			origin: OriginFor<T>,
 			status: bool,
 		) -> DispatchResultWithPostInfo {
-			// Ensure GameOverlordOrigin makes call
-			T::GameOverlordOrigin::ensure_origin(origin)?;
+			// Ensure Overlord account makes call
+			let sender = ensure_signed(origin)?;
+			ensure!(Self::overlord().map_or(false, |k| sender == k), Error::<T>::RequireOverlordAccount);
 			let claim_spirit_status = <CanClaimSpirits<T>>::get();
 			<CanClaimSpirits<T>>::put(!claim_spirit_status);
 
@@ -628,18 +701,19 @@ pub mod pallet {
 			Ok(Pays::No.into())
 		}
 
-		/// Flip Rare Eggs status for purchase with the GameOverlordOrigin Account to allow
+		/// Set Rare Eggs status for purchase with the Overlord Admin Account to allow
 		/// users to claim their Spirits through the `claim_spirits()` function
 		///
 		/// Parameters:
-		/// `origin`: Expected to be called by `GameOverlordOrigin`
+		/// `origin`: Expected to be called by `Overlord` admin account
 		#[pallet::weight(0)]
 		pub fn set_purchase_rare_eggs_status(
 			origin: OriginFor<T>,
 			status: bool,
 		) -> DispatchResultWithPostInfo {
-			// Ensure GameOverlordOrigin makes call
-			T::GameOverlordOrigin::ensure_origin(origin)?;
+			// Ensure Overlord account makes call
+			let sender = ensure_signed(origin)?;
+			ensure!(Self::overlord().map_or(false, |k| sender == k), Error::<T>::RequireOverlordAccount);
 			let purchase_rare_eggs_status = <CanPurchaseRareEggs<T>>::get();
 			<CanPurchaseRareEggs<T>>::put(!purchase_rare_eggs_status);
 
@@ -650,18 +724,19 @@ pub mod pallet {
 			Ok(Pays::No.into())
 		}
 
-		/// Set status of Preordering eggs with the GameOverlordOrigin Account to allow
+		/// Set status of Preordering eggs with the Overlord Admin Account to allow
 		/// users to preorder eggs through the `preorder_egg()` function
 		///
 		/// Parameters:
-		/// `origin`: Expected to be called by `GameOverlordOrigin`
+		/// `origin`: Expected to be called by `Overlord` admin account
 		#[pallet::weight(0)]
 		pub fn set_preorder_eggs_status(
 			origin: OriginFor<T>,
 			status: bool,
 		) -> DispatchResultWithPostInfo {
-			// Ensure GameOverlordOrigin makes call
-			T::GameOverlordOrigin::ensure_origin(origin)?;
+			// Ensure Overlord account makes call
+			let sender = ensure_signed(origin)?;
+			ensure!(Self::overlord().map_or(false, |k| sender == k), Error::<T>::RequireOverlordAccount);
 			let preorder_eggs_status = <CanPreorderEggs<T>>::get();
 			<CanPreorderEggs<T>>::put(!preorder_eggs_status);
 
