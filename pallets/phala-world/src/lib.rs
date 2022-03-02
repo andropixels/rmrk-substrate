@@ -5,6 +5,10 @@ use frame_support::{
 };
 use frame_system::ensure_signed;
 
+
+use sp_core::{H256, sr25519};
+use sp_io::crypto::sr25519_verify;
+use codec::{Decode, Encode};
 use sp_std::prelude::*;
 use sp_std::result::Result;
 
@@ -119,6 +123,7 @@ pub mod pallet {
 	use sp_runtime::traits::StaticLookup;
 	use frame_support::sp_runtime::traits::Zero;
 	use frame_system::Origin;
+	use sp_core::sr25519::Signature;
 	use rmrk_traits::Nft;
 
 	type BalanceOf<T> =
@@ -385,6 +390,7 @@ pub mod pallet {
 		RareEggPurchaseNotAvailable,
 		PreorderEggNotAvailable,
 		SpiritAlreadyClaimed,
+		ClaimVerificationFailed,
 		ClaimIsOver,
 		InsufficientFunds,
 		InvalidPurchase,
@@ -421,20 +427,26 @@ pub mod pallet {
 		pub fn claim_spirit(
 			origin: OriginFor<T>,
 			serial_id: SerialId,
-			signature: BoundedVec<u8, T::StringLimit>, // TODO: change to Signature
+			signature: sr25519::Signature,
 			metadata: BoundedVec<u8, T::StringLimit>,
 		) -> DispatchResult {
 			ensure!(CanClaimSpirits::<T>::get(), Error::<T>::ClaimIsOver);
-			let sender = ensure_signed(origin.clone())?;
+			let sender = ensure_signed(origin)?;
 			let overlord = <Overlord<T>>::get();
 			match overlord {
 				None => Err(Error::<T>::OverlordNotSet.into()),
 				Some(overlord) => {
 					// Has the SerialId already been claimed
-					ensure!(!ClaimedSpirits::<T>::contains_key(serial_id), Error::<T>::SpiritAlreadyClaimed);
-
-					// TODO: Check if valid SerialId to claim a spirit
-
+					ensure!(
+						!ClaimedSpirits::<T>::contains_key(serial_id),
+						Error::<T>::SpiritAlreadyClaimed
+					);
+					// Check if valid SerialId to claim a spirit
+					ensure!(
+						Self::verify_claim(sender.clone(),
+						metadata.clone(), signature),
+						Error::<T>::ClaimVerificationFailed
+					);
 					// Mint new Spirit and transfer to sender
 					pallet_rmrk_core::Pallet::<T>::mint_nft(
 						Origin::<T>::Signed(overlord).into(),
@@ -474,7 +486,8 @@ pub mod pallet {
 		) -> DispatchResult {
 			ensure!(CanPurchaseRareEggs::<T>::get(), Error::<T>::RareEggPurchaseNotAvailable);
 			let sender = ensure_signed(origin)?;
-			// TODO: Ensure sender has a Spirit before purchasing an Egg
+			// Ensure sender has a Spirit before purchasing an Egg
+
 			// Do we want to iterate through owned NFTs for a Spirit NFT since this won't be a highly
 			// used function?
 			let egg_price = match egg_type {
@@ -745,6 +758,35 @@ pub mod pallet {
 			});
 
 			Ok(Pays::No.into())
+		}
+	}
+}
+
+
+impl<T: Config> Pallet<T> {
+	/// Verify the claim status of an Account that has claimed a spirit. Serialize the evidence with
+	/// the provided account and metadata and verify the against the expected results by validating
+	/// against the Overlord account used to sign and generate the whitelisted user's SerialId
+	///
+	/// Parameters:
+	/// - claimer: AccountId of the account claiming the spirit
+	/// - metadata: Metadata passed in associated with the claimer
+	/// - signature: Signature of the claimer
+	pub fn verify_claim(
+		claimer: T::AccountId,
+		metadata: BoundedVec<u8, T::StringLimit>,
+		signature: sr25519::Signature,
+	) -> bool {
+		// Serialize the evidence
+		let msg = Encode::encode(&(claimer, metadata));
+		if let Some(overlord) = <Overlord<T>>::get() {
+			let encode_overlord = T::AccountId::encode(&overlord);
+			let h256_overlord = H256::from_slice(&encode_overlord);
+			let overlord_key = sr25519::Public::from_h256(h256_overlord);
+			// verify claim
+			sp_io::crypto::sr25519_verify(&signature, &msg, &overlord_key)
+		} else {
+			false
 		}
 	}
 }
