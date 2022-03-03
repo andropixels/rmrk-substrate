@@ -693,8 +693,7 @@ pub mod pallet {
 			new_overlord: <T::Lookup as StaticLookup>::Source,
 		) -> DispatchResultWithPostInfo {
 			// This is a public call, so we ensure that the origin is some signed account.
-			let sender = ensure_signed(origin)?;
-			ensure!(Self::overlord().map_or(false, |k| sender == k), Error::<T>::RequireOverlordAccount);
+			ensure_root(origin)?;
 			let new_overlord = T::Lookup::lookup(new_overlord)?;
 			let old_overlord = <Overlord<T>>::get();
 
