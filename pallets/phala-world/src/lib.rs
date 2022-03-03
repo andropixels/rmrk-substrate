@@ -122,6 +122,7 @@ pub mod pallet {
 	use frame_system::pallet_prelude::*;
 	use sp_runtime::traits::StaticLookup;
 	use frame_support::sp_runtime::traits::Zero;
+	use frame_support::traits::ExistenceRequirement;
 	use frame_system::Origin;
 	use sp_core::sr25519::Signature;
 	use rmrk_traits::Nft;
@@ -143,6 +144,15 @@ pub mod pallet {
 		/// Block per Era that will increment the Era storage value every interval
 		#[pallet::constant]
 		type BlocksPerEra: Get<Self::BlockNumber>;
+		/// Price of Founder Egg Price
+		#[pallet::constant]
+		type FounderEggPrice: Get<BalanceOf<Self>>;
+		/// Price of Legendary Egg Price
+		#[pallet::constant]
+		type LegendaryEggPrice: Get<BalanceOf<Self>>;
+		/// Price of Normal Egg Price
+		#[pallet::constant]
+		type NormalEggPrice: Get<BalanceOf<Self>>;
 	}
 
 	#[pallet::pallet]
@@ -173,7 +183,7 @@ pub mod pallet {
 		CollectionId,
 		Blake2_128Concat,
 		NftId,
-		EggInfo<CollectionId, NftId>,
+		EggInfo,
 	>;
 
 	/// Food per Owner where an owner gets 5 food per era
@@ -297,14 +307,8 @@ pub mod pallet {
 			serial_id: SerialId,
 			owner: T::AccountId,
 		},
-		/// Founder egg has been purchased
-		FounderEggPurchased {
-			collection_id: CollectionId,
-			nft_id: NftId,
-			owner: T::AccountId,
-		},
-		/// Legendary egg has been purchased
-		LegendaryEggPurchased {
+		/// Rare egg has been purchased
+		RareEggPurchased {
 			collection_id: CollectionId,
 			nft_id: NftId,
 			owner: T::AccountId,
@@ -443,8 +447,11 @@ pub mod pallet {
 					);
 					// Check if valid SerialId to claim a spirit
 					ensure!(
-						Self::verify_claim(sender.clone(),
-						metadata.clone(), signature),
+						Self::verify_claim(
+							sender.clone(),
+							metadata.clone(),
+							signature
+						),
 						Error::<T>::ClaimVerificationFailed
 					);
 					// Mint new Spirit and transfer to sender
@@ -456,8 +463,8 @@ pub mod pallet {
 						None,
 						metadata,
 					)?;
-
 					ClaimedSpirits::<T>::insert(serial_id, true);
+
 					Self::deposit_event(Event::SpiritClaimed {
 						serial_id,
 						owner: sender,
@@ -483,26 +490,61 @@ pub mod pallet {
 			egg_type: EggType,
 			race: RaceType,
 			career: CareerType,
+			metadata: BoundedVec<u8, T::StringLimit>,
 		) -> DispatchResult {
 			ensure!(CanPurchaseRareEggs::<T>::get(), Error::<T>::RareEggPurchaseNotAvailable);
-			let sender = ensure_signed(origin)?;
-			// Ensure sender has a Spirit before purchasing an Egg
+			let sender = ensure_signed(origin.clone())?;
+			let overlord = <Overlord<T>>::get();
+			match overlord {
+				None => Err(Error::<T>::OverlordNotSet.into()),
+				Some(overlord) => {
+					// Get Egg Price based on EggType
+					let egg_price = match egg_type {
+						2 => {
+							T::FounderEggPrice::get()
+						},
+						1 => {
+							T::LegendaryEggPrice::get()
+						},
+						_ => T::NormalEggPrice::get(),
+					};
+					ensure!(egg_price != T::NormalEggPrice::get(), Error::<T>::InvalidPurchase);
+					let nft_id = pallet_rmrk_core::NextNftId::<T>::get(EGGS_COLLECTION_ID);
+					// Transfer the amount for the rare Egg NFT then mint the egg
+					<T as pallet::Config>::Currency::transfer(
+						&sender,
+						&overlord,
+						egg_price,
+						ExistenceRequirement::KeepAlive
+					)?;
+					// Mint Egg and transfer Egg to new owner
+					pallet_rmrk_core::Pallet::<T>::mint_nft(
+						Origin::<T>::Signed(overlord.clone()).into(),
+						sender.clone(),
+						EGGS_COLLECTION_ID,
+						None,
+						None,
+						metadata,
+					)?;
+					// Add EggInfo to storage
+					let egg = EggInfo {
+						egg_type,
+						race,
+						career,
+						start_hatching: 0,
+						hatching_duration: 0,
+					};
+					Eggs::<T>::insert(EGGS_COLLECTION_ID, nft_id, egg);
 
-			// Do we want to iterate through owned NFTs for a Spirit NFT since this won't be a highly
-			// used function?
-			let egg_price = match egg_type {
-				2 => {
-					FOUNDER_EGG_PRICE
-				},
-				1 => {
-					LEGENDARY_EGG_PRICE
-				},
-				_ => 0,
-			};
-			ensure!(egg_price != 0, Error::<T>::InvalidPurchase);
-			// Transfer the amount for the rare Egg NFT then mint the egg
+					Self::deposit_event(Event::RareEggPurchased {
+						collection_id: EGGS_COLLECTION_ID,
+						nft_id,
+						owner: sender,
+					});
 
-			Ok(())
+					Ok(())
+				}
+			}
 		}
 
 		/// Users can pre-order an egg. This will enable users that are whitelisted to be

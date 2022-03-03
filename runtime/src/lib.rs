@@ -315,12 +315,18 @@ impl pallet_rmrk_core::Config for Runtime {
 
 parameter_types! {
     pub const BlocksPerEra: BlockNumber = DAYS;
+	pub const FounderEggPrice: Balance = 10_000 * DOLLARS;
+    pub const LegendaryEggPrice: Balance = 1_000 * DOLLARS;
+	pub const NormalEggPrice: Balance = 100 * DOLLARS;
 }
 impl pallet_phala_world::Config for Runtime {
 	type Event = Event;
 	type OverlordOrigin = frame_system::EnsureRoot<AccountId>;
 	type Currency = Balances;
 	type BlocksPerEra = BlocksPerEra;
+	type FounderEggPrice = FounderEggPrice;
+	type LegendaryEggPrice = LegendaryEggPrice;
+	type NormalEggPrice = NormalEggPrice;
 }
 
 parameter_types! {

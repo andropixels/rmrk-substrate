@@ -36,8 +36,17 @@ fn mint_collection(account: AccountId32) {
 #[test]
 fn claimed_spirit_works() {
 	ExtBuilder::default().build(ALICE).execute_with(|| {
+		// let overlord_pair = sr25519::Pair::from_seed(b"12345678901234567890123456789012");
+		// let overlord_pub = overlord_pair.public();
+		//
 		// Enable spirits to be claimed
 		assert_ok!(PhalaWorld::set_claim_spirits_status(Origin::signed(ALICE), true));
+		//assert_ok!(PhalaWorld::set_overlord(Origin::signed(ALICE), AccountId32::new(overlord_pub)));
+
+		//let metadata = stb("I am Overlord");
+		//let claim = Encode::encode(&(ALICE, metadata.clone()));
+		//let overlord_signature = overlord_pair.sign(&claim);
+
 		// Mint collection with Overlord account ALICE
 		mint_collection(ALICE);
 		// Dispatch a claim spirit
@@ -48,6 +57,11 @@ fn claimed_spirit_works() {
 #[test]
 fn claimed_spirit_twice_fails() {
 	ExtBuilder::default().build(ALICE).execute_with(|| {
+		// let overlord_pair = sr25519::Pair::from_seed(b"12345678901234567890123456789012");
+		// let overlord_pub = overlord_pair.public();
+		// let metadata = stb("I am Overlord");
+		// let claim = Encode::encode(&(BOB, metadata.clone()));
+		// let overlord_signature = overlord_pair.sign(&claim);
 		// Set the Overlord Admin account
 		assert_ok!(PhalaWorld::set_overlord(Origin::signed(ALICE), BOB));
 		// Alice can no longer set the Overlord Admin account

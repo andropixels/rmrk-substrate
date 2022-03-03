@@ -9,12 +9,14 @@ use frame_support::{
 };
 use frame_system as system;
 use frame_system::{EnsureRoot};
-use sp_core::{crypto::AccountId32, H256};
+use sp_core::{crypto::AccountId32, H256, Pair, Public};
+use sp_core::sr25519::{Signature};
 
 use sp_runtime::{
 	testing::Header,
 	traits::{BlakeTwo256, IdentityLookup},
 };
+use rmrk_traits::AccountIdOrCollectionNftTuple;
 
 type AccountId = AccountId32;
 type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
@@ -102,13 +104,13 @@ impl pallet_rmrk_core::Config for Test {
 }
 
 parameter_types! {
-	pub const ClassDeposit: Balance = 10_000 * RMRK; // 1 UNIT deposit to create asset class
-	pub const InstanceDeposit: Balance = 100 * RMRK; // 1/100 UNIT deposit to create asset instance
+	pub const ClassDeposit: Balance = 10_000 * PHA; // 1 UNIT deposit to create asset class
+	pub const InstanceDeposit: Balance = 100 * PHA; // 1/100 UNIT deposit to create asset instance
 	pub const KeyLimit: u32 = 32;	// Max 32 bytes per key
 	pub const ValueLimit: u32 = 64;	// Max 64 bytes per value
-	pub const UniquesMetadataDepositBase: Balance = 1000 * RMRK;
-	pub const AttributeDepositBase: Balance = 100 * RMRK;
-	pub const DepositPerByte: Balance = 10 * RMRK;
+	pub const UniquesMetadataDepositBase: Balance = 1000 * PHA;
+	pub const AttributeDepositBase: Balance = 100 * PHA;
+	pub const DepositPerByte: Balance = 10 * PHA;
 	pub const UniquesStringLimit: u32 = 32;
 }
 
@@ -143,6 +145,9 @@ impl pallet_rmrk_market::Config for Test {
 
 parameter_types! {
 	pub const BlocksPerEra: BlockNumber = 5;
+	pub const FounderEggPrice: Balance = 1_000 * PHA;
+	pub const LegendaryEggPrice: Balance = 100 * PHA;
+	pub const NormalEggPrice: Balance = 10 * PHA;
 }
 
 impl Config for Test {
@@ -150,6 +155,9 @@ impl Config for Test {
 	type OverlordOrigin = EnsureRoot<AccountId>;
 	type Currency = Balances;
 	type BlocksPerEra = BlocksPerEra;
+	type FounderEggPrice = FounderEggPrice;
+	type LegendaryEggPrice = LegendaryEggPrice;
+	type NormalEggPrice = NormalEggPrice;
 }
 
 pub type SystemCall = frame_system::Call<Test>;
@@ -166,7 +174,7 @@ pub fn fast_forward_to(n: u64) {
 pub const ALICE: AccountId = AccountId::new([1u8; 32]);
 pub const BOB: AccountId = AccountId::new([2u8; 32]);
 pub const CHARLIE: AccountId = AccountId::new([3u8; 32]);
-pub const RMRK: Balance = 1;
+pub const PHA: Balance = 1;
 pub const UNITS: Balance = 100_000_000_000;
 
 pub const MILLISECS_PER_BLOCK: u64 = 3_000;
@@ -200,9 +208,9 @@ impl ExtBuilder {
 
 		pallet_balances::GenesisConfig::<Test> {
 			balances: vec![
-				(ALICE, 20_000_000 * RMRK),
-				(BOB, 15_000 * RMRK),
-				(CHARLIE, 150_000 * RMRK),
+				(ALICE, 20_000_000 * PHA),
+				(BOB, 15_000 * PHA),
+				(CHARLIE, 150_000 * PHA),
 			],
 		}
 			.assimilate_storage(&mut t)

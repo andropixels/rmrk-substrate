@@ -76,13 +76,9 @@ use sp_std::result::Result;
 
 #[derive(Encode, Decode, Eq, PartialEq, Clone, RuntimeDebug, TypeInfo)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
-pub struct EggInfo<CollectionId, NftId> {
+pub struct EggInfo {
     /// Egg type of the Egg RMRK NFT
     pub egg_type: EggType,
-    /// Collection id of the Egg RMRK NFT
-    pub collection_id: CollectionId,
-    /// NFT id of the Egg RMRK NFT
-    pub nft_id: NftId,
     /// Race type of the Egg RMRK NFT
     pub race: RaceType,
     /// Career type of the Egg RMRK NFT
