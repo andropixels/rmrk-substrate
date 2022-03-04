@@ -1,15 +1,15 @@
 use crate::{mock::*, Error};
-use frame_support::{assert_noop, assert_ok, assert_storage_noop};
+use frame_support::{assert_noop, assert_ok, error::BadOrigin};
 use sp_core::crypto::AccountId32;
 use sp_core::Pair;
 
 use super::*;
 use mock::{
-	Event as MockEvent, ExtBuilder, Balances, BalanceCall, Call, PhalaWorld, Origin, SystemCall, Test,
+	Event as MockEvent, ExtBuilder, Balances, Call, PhalaWorld, Origin, Test,
 };
 
 /// Turns a string into a BoundedVec
-fn stb(s: &str) -> BoundedVec<u8, ValueLimit> {
+fn stb(s: &str) -> BoundedVec<u8, UniquesStringLimit> {
 	s.as_bytes().to_vec().try_into().unwrap()
 }
 
@@ -41,31 +41,30 @@ fn claimed_spirit_works() {
 		// let overlord_pub = overlord_pair.public();
 		// Enable spirits to be claimed
 		assert_ok!(PhalaWorld::set_status_type(Origin::signed(ALICE), true, StatusType::ClaimSpirits));
-		//assert_ok!(PhalaWorld::set_overlord(Origin::signed(ALICE), AccountId32::new(overlord_pub)));
 
 		let metadata = stb("I am Overlord");
-		let claim = Encode::encode(&(ALICE, metadata.clone()));
+		let claim = Encode::encode(&(BOB, metadata.clone()));
 		let overlord_signature = overlord_pair.sign(&claim);
 
 		// Mint collection with Overlord account ALICE
 		mint_collection(ALICE);
-		// Dispatch a claim spirit
-		assert_ok!(PhalaWorld::claim_spirit(Origin::signed(ALICE), 1, overlord_signature, bvec![0u8; 20]));
+		// Dispatch a claim spirit from BOB's account
+		assert_ok!(PhalaWorld::claim_spirit(Origin::signed(BOB), 1, overlord_signature, metadata));
 	});
 }
 
 #[test]
 fn claimed_spirit_twice_fails() {
 	ExtBuilder::default().build(ALICE).execute_with(|| {
-		let overlord_pair = sr25519::Pair::from_seed(b"12345678901234567890123456789012");
-		// let overlord_pub = overlord_pair.public();
+		let overlord_pair = sr25519::Pair::from_seed(b"09876543210987654321098765432109");
+		//let overlord_pub = overlord_pair.public();
 		let metadata = stb("I am Overlord");
-		let claim = Encode::encode(&(BOB, metadata.clone()));
+		let claim = Encode::encode(&(ALICE, metadata.clone()));
 		let overlord_signature = overlord_pair.sign(&claim);
 		// Set the Overlord Admin account
-		assert_ok!(PhalaWorld::set_overlord(Origin::signed(ALICE), BOB));
-		// Alice can no longer set the Overlord Admin account
-		assert_noop!(PhalaWorld::set_overlord(Origin::signed(ALICE), BOB), Error::<Test>::RequireOverlordAccount);
+		assert_ok!(PhalaWorld::set_overlord(Origin::root(), BOB));
+		//  Only root can set the Overlord Admin account
+		assert_noop!(PhalaWorld::set_overlord(Origin::signed(ALICE), BOB), BadOrigin);
 		// Last Event Overlord changed from None
 		System::assert_last_event(MockEvent::PhalaWorld(crate::Event::OverlordChanged {
 			old_overlord: Some(ALICE),
@@ -74,18 +73,20 @@ fn claimed_spirit_twice_fails() {
 		mint_collection(BOB);
 		// Enable spirits to be claimed
 		assert_ok!(PhalaWorld::set_status_type(Origin::signed(BOB), true, StatusType::ClaimSpirits));
-		// Dispatch a claim spirit
-		assert_ok!(PhalaWorld::claim_spirit(Origin::signed(ALICE), 1, overlord_signature.clone(), bvec![0u8; 20]));
+		// Dispatch a claim spirit from ALICE's account
+		assert_ok!(PhalaWorld::claim_spirit(Origin::signed(ALICE), 1, overlord_signature.clone(), metadata.clone()));
 		// Fail to dispatch a second claim spirit
-		assert_noop!(PhalaWorld::claim_spirit(Origin::signed(ALICE), 1, overlord_signature, bvec![0u8; 20]), Error::<Test>::SpiritAlreadyClaimed);
+		assert_noop!(PhalaWorld::claim_spirit(Origin::signed(ALICE), 1, overlord_signature, metadata), Error::<Test>::SpiritAlreadyClaimed);
 	});
 }
 
 #[test]
 fn start_world_clock_works() {
 	ExtBuilder::default().build(ALICE).execute_with(|| {
+		// Set the Overlord Admin account
+		assert_ok!(PhalaWorld::set_overlord(Origin::root(), ALICE));
 		// Initialize the Phala World Clock
-		assert_ok!(PhalaWorld::initialize_world_clock(Origin::root()));
+		assert_ok!(PhalaWorld::initialize_world_clock(Origin::signed(ALICE)));
 	});
 }
 

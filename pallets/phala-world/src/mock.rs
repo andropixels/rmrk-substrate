@@ -171,9 +171,8 @@ pub fn fast_forward_to(n: u64) {
 	}
 }
 
-pub const ALICE: AccountId = AccountId::new([1u8; 32]);
-
-pub const BOB: AccountId = AccountId::new([2u8; 32]);
+pub const ALICE: AccountId = AccountId::new([116, 28, 8, 160, 111, 65, 197, 150, 96, 143, 103, 116, 37, 155, 217, 4, 51, 4, 173, 250, 93, 62, 234, 98, 118, 11, 217, 190, 151, 99, 77, 99]);
+pub const BOB: AccountId = AccountId::new([250, 140, 153, 155, 88, 13, 83, 23, 193, 161, 236, 241, 58, 213, 107, 213, 230, 33, 38, 154, 78, 125, 67, 186, 54, 157, 62, 131, 179, 150, 232, 82]);
 pub const CHARLIE: AccountId = AccountId::new([3u8; 32]);
 pub const PHA: Balance = 1;
 pub const UNITS: Balance = 100_000_000_000;
