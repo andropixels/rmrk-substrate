@@ -172,6 +172,7 @@ pub fn fast_forward_to(n: u64) {
 }
 
 pub const ALICE: AccountId = AccountId::new([1u8; 32]);
+
 pub const BOB: AccountId = AccountId::new([2u8; 32]);
 pub const CHARLIE: AccountId = AccountId::new([3u8; 32]);
 pub const PHA: Balance = 1;

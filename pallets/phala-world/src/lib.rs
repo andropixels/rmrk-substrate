@@ -9,8 +9,10 @@ use frame_system::ensure_signed;
 use sp_core::{H256, sr25519};
 use sp_io::crypto::sr25519_verify;
 use codec::{Decode, Encode};
+use sp_runtime::DispatchResult;
 use sp_std::prelude::*;
 use sp_std::result::Result;
+use scale_info::TypeInfo;
 
 pub use pallet_rmrk_core::types::*;
 pub use pallet_rmrk_market;
@@ -88,6 +90,7 @@ pub const NORMAL_EGG_PRICE: u128 = 1_000;
 //	HackerWizard = 3,
 //	Web3Monk = 4,
 //}
+#[derive(Encode, Decode, Debug, Clone, PartialEq, TypeInfo)]
 pub enum StatusType {
 	ClaimSpirits = 0,
 	PurchaseRareEggs = 1,
@@ -117,6 +120,7 @@ impl StatusType {
 
 #[frame_support::pallet]
 pub mod pallet {
+	use std::os::linux::raw::stat;
 	use super::*;
 	use frame_support::{dispatch::DispatchResult, pallet_prelude::*};
 	use frame_system::pallet_prelude::*;
@@ -715,7 +719,8 @@ pub mod pallet {
 			origin: OriginFor<T>,
 		) -> DispatchResultWithPostInfo {
 			// Ensure Overlord account makes call
-			T::OverlordOrigin::ensure_origin(origin)?;
+			let sender = ensure_signed(origin)?;
+			ensure!(Self::overlord().map_or(false, |k| sender == k), Error::<T>::RequireOverlordAccount);
 			// Ensure ZeroDay is None as this can only be set once
 			ensure!(Self::zero_day() == None, Error::<T>::WorldClockAlreadySet);
 
@@ -729,77 +734,31 @@ pub mod pallet {
 			Ok(Pays::No.into())
 		}
 
-		// TODO: Change the following to helper functions and create a set status function to
-		// the appropriate function
-
-		/// Set Spirit Claims with the Overlord admin Account to allow users to claim their
-		/// Spirits through the `claim_spirits()` function
+		/// Privileged function to set the status for one of the defined StatusTypes like ClaimSpirits,
+		/// PurchaseRareEggs, or PreorderEggs to enable functionality in Phala World
 		///
 		/// Parameters:
-		/// `origin`: Expected to be called by `Overlord` admin account
+		/// - `origin` - Expected Overlord admin account to set the status
+		/// - `status` - `bool` to set the status to
+		/// - `status_type` - `StatusType` to set the status for
 		#[pallet::weight(0)]
-		pub fn set_claim_spirits_status(
+		pub fn set_status_type(
 			origin: OriginFor<T>,
 			status: bool,
+			status_type: StatusType,
 		) -> DispatchResultWithPostInfo {
 			// Ensure Overlord account makes call
 			let sender = ensure_signed(origin)?;
 			ensure!(Self::overlord().map_or(false, |k| sender == k), Error::<T>::RequireOverlordAccount);
-			let claim_spirit_status = <CanClaimSpirits<T>>::get();
-			<CanClaimSpirits<T>>::put(!claim_spirit_status);
-
-			Self::deposit_event(Event::ClaimSpiritStatusChanged {
-				status: !claim_spirit_status,
-			});
-
+			// Match StatusType and call helper function to set status
+			match status_type {
+				StatusType::ClaimSpirits => Self::set_claim_spirits_status(status)?,
+				StatusType::PurchaseRareEggs => Self::set_purchase_rare_eggs_status(status)?,
+				StatusType::PreorderEggs => Self::set_preorder_eggs_status(status)?,
+			}
 			Ok(Pays::No.into())
 		}
 
-		/// Set Rare Eggs status for purchase with the Overlord Admin Account to allow
-		/// users to claim their Spirits through the `claim_spirits()` function
-		///
-		/// Parameters:
-		/// `origin`: Expected to be called by `Overlord` admin account
-		#[pallet::weight(0)]
-		pub fn set_purchase_rare_eggs_status(
-			origin: OriginFor<T>,
-			status: bool,
-		) -> DispatchResultWithPostInfo {
-			// Ensure Overlord account makes call
-			let sender = ensure_signed(origin)?;
-			ensure!(Self::overlord().map_or(false, |k| sender == k), Error::<T>::RequireOverlordAccount);
-			let purchase_rare_eggs_status = <CanPurchaseRareEggs<T>>::get();
-			<CanPurchaseRareEggs<T>>::put(!purchase_rare_eggs_status);
-
-			Self::deposit_event(Event::PurchaseRareEggsStatusChanged {
-				status: !purchase_rare_eggs_status,
-			});
-
-			Ok(Pays::No.into())
-		}
-
-		/// Set status of Preordering eggs with the Overlord Admin Account to allow
-		/// users to preorder eggs through the `preorder_egg()` function
-		///
-		/// Parameters:
-		/// `origin`: Expected to be called by `Overlord` admin account
-		#[pallet::weight(0)]
-		pub fn set_preorder_eggs_status(
-			origin: OriginFor<T>,
-			status: bool,
-		) -> DispatchResultWithPostInfo {
-			// Ensure Overlord account makes call
-			let sender = ensure_signed(origin)?;
-			ensure!(Self::overlord().map_or(false, |k| sender == k), Error::<T>::RequireOverlordAccount);
-			let preorder_eggs_status = <CanPreorderEggs<T>>::get();
-			<CanPreorderEggs<T>>::put(!preorder_eggs_status);
-
-			Self::deposit_event(Event::PreorderEggsStatusChanged {
-				status: !preorder_eggs_status,
-			});
-
-			Ok(Pays::No.into())
-		}
 	}
 }
 
@@ -829,5 +788,56 @@ impl<T: Config> Pallet<T> {
 		} else {
 			false
 		}
+	}
+
+	/// Set Spirit Claims with the Overlord admin Account to allow users to claim their
+	/// Spirits through the `claim_spirits()` function
+	///
+	/// Parameters:
+	/// - `status`: Status to set CanClaimSpirits StorageValue
+	fn set_claim_spirits_status(
+		status: bool,
+	) -> DispatchResult {
+		<CanClaimSpirits<T>>::put(status);
+
+		Self::deposit_event(Event::ClaimSpiritStatusChanged {
+			status,
+		});
+
+		Ok(())
+	}
+
+	/// Set Rare Eggs status for purchase with the Overlord Admin Account to allow
+	/// users to purchase either Founder or Legendary Eggs
+	///
+	/// Parameters:
+	/// `status`: Status to set CanPurchaseRareEggs StorageValue
+	fn set_purchase_rare_eggs_status(
+		status: bool,
+	) -> DispatchResult {
+		<CanPurchaseRareEggs<T>>::put(status);
+
+		Self::deposit_event(Event::PurchaseRareEggsStatusChanged {
+			status,
+		});
+
+		Ok(())
+	}
+
+	/// Set status of Preordering eggs with the Overlord Admin Account to allow
+	/// users to preorder eggs through the `preorder_egg()` function
+	///
+	/// Parameters:
+	/// - `status`: Status to set CanPreorderEggs StorageValue
+	fn set_preorder_eggs_status(
+		status: bool,
+	) -> DispatchResult {
+		<CanPreorderEggs<T>>::put(status);
+
+		Self::deposit_event(Event::PreorderEggsStatusChanged {
+			status,
+		});
+
+		Ok(())
 	}
 }
