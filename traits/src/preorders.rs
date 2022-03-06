@@ -11,8 +11,6 @@ use serde::{Deserialize, Serialize};
 pub struct PreorderInfo<AccountId> {
     /// Account owner of the Egg preorder
     pub owner: AccountId,
-    /// Egg type of the preorder
-    pub egg_type: EggType,
     /// Race type of the preorder
     pub race: RaceType,
     /// Career type of the preorder

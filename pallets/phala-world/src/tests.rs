@@ -93,7 +93,7 @@ fn start_world_clock_works() {
 #[test]
 fn auto_increment_era_works() {
 	ExtBuilder::default().build(ALICE).execute_with(|| {
-		// Set Overlord admin as ALICE
+		// Set Overlord admin as BOB
 		assert_ok!(PhalaWorld::set_overlord(Origin::root(), BOB));
 		System::assert_last_event(MockEvent::PhalaWorld(crate::Event::OverlordChanged {
 			old_overlord: Some(ALICE),
@@ -110,6 +110,22 @@ fn auto_increment_era_works() {
 		System::assert_last_event(MockEvent::PhalaWorld(crate::Event::NewEra {
 			time: 6,
 			era: 1,
+		}));
+	});
+}
+
+#[test]
+fn preorder_egg_works() {
+	ExtBuilder::default().build(ALICE).execute_with(|| {
+		// Set the Overlord Admin account
+		assert_ok!(PhalaWorld::set_overlord(Origin::root(), ALICE));
+		// Enable preorder of eggs
+		assert_ok!(PhalaWorld::set_status_type(Origin::signed(ALICE), true, StatusType::PreorderEggs));
+		// BOB preorders an egg
+		assert_ok!(PhalaWorld::preorder_egg(Origin::signed(BOB), 0u8, 0u8));
+		// Check if event triggered
+		System::assert_last_event(MockEvent::PhalaWorld(crate::Event::EggPreordered {
+			owner: BOB,
 		}));
 	});
 }

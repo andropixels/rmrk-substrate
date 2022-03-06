@@ -40,12 +40,6 @@ pub const SPIRIT_COLLECTION_ID: u32 = 0;
 pub const EGGS_COLLECTION_ID: u32 = 1;
 /// Constant for amount of time it takes for an Egg to hatch after hatching is started
 pub const HATCHING_DURATION: u64 = 1_000_000;
-/// Constant for Founder Eggs Price
-pub const FOUNDER_EGG_PRICE: u128 = 1_000_000;
-/// Constant for Legendary Eggs Price
-pub const LEGENDARY_EGG_PRICE: u128 = 100_000;
-/// Constant for Normal Eggs Price
-pub const NORMAL_EGG_PRICE: u128 = 1_000;
 
 // Egg Types of Normal, Legendary & Founder
 // #[derive(Encode, Decode, Copy, Clone, PartialEq)]
@@ -126,7 +120,7 @@ pub mod pallet {
 	use frame_system::pallet_prelude::*;
 	use sp_runtime::traits::StaticLookup;
 	use frame_support::sp_runtime::traits::Zero;
-	use frame_support::traits::ExistenceRequirement;
+	use frame_support::traits::{ExistenceRequirement, ReservableCurrency};
 	use frame_system::Origin;
 	use sp_core::sr25519::Signature;
 	use rmrk_traits::Nft;
@@ -144,7 +138,7 @@ pub mod pallet {
 		/// The origin which may forcibly buy, sell, list/unlist, offer & withdraw offer on Tokens
 		type OverlordOrigin: EnsureOrigin<Self::Origin>;
 		/// The market currency mechanism.
-		type Currency: Currency<Self::AccountId>;
+		type Currency: ReservableCurrency<Self::AccountId>;
 		/// Block per Era that will increment the Era storage value every interval
 		#[pallet::constant]
 		type BlocksPerEra: Get<Self::BlockNumber>;
@@ -319,7 +313,6 @@ pub mod pallet {
 		},
 		/// A chance to get an egg through preorder
 		EggPreordered {
-			price: BalanceOf<T>,
 			owner: T::AccountId,
 		},
 		/// Egg claimed from the winning preorder
@@ -570,6 +563,20 @@ pub mod pallet {
 			ensure!(CanPreorderEggs::<T>::get(), Error::<T>::PreorderEggNotAvailable);
 			let sender = ensure_signed(origin)?;
 
+			// Reserve currency for the preorder at the Normal egg price
+			<T as pallet::Config>::Currency::reserve(&sender, T::NormalEggPrice::get())?;
+
+			let preorder = PreorderInfo {
+				owner: sender.clone(),
+				race,
+				career,
+			};
+			<Preorders<T>>::get().push(preorder.into());
+
+			Self::deposit_event(Event::EggPreordered {
+				owner: sender,
+			});
+
 			Ok(())
 		}
 
@@ -581,8 +588,9 @@ pub mod pallet {
 		pub fn mint_eggs(
 			origin: OriginFor<T>,
 		) -> DispatchResult {
-			// Ensure OverlordOrigin makes call
-			T::OverlordOrigin::ensure_origin(origin)?;
+			// Ensure Overlord account makes call
+			let sender = ensure_signed(origin)?;
+			ensure!(Self::overlord().map_or(false, |k| sender == k), Error::<T>::RequireOverlordAccount);
 
 			Ok(())
 		}
