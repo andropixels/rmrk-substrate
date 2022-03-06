@@ -41,6 +41,7 @@ pub use pallet_template;
 
 pub use pallet_rmrk_core;
 
+pub use pallet_rmrk_equip;
 pub use pallet_rmrk_market;
 
 pub use pallet_phala_world;
@@ -305,12 +306,14 @@ impl pallet_template::Config for Runtime {
 
 parameter_types! {
 	pub const MaxRecursions: u32 = 10;
+	pub const ResourceSymbolLimit: u32 = 10;
 }
 
 impl pallet_rmrk_core::Config for Runtime {
 	type Event = Event;
 	type ProtocolOrigin = frame_system::EnsureRoot<AccountId>;
 	type MaxRecursions = MaxRecursions;
+	type ResourceSymbolLimit = ResourceSymbolLimit;
 }
 
 parameter_types! {
@@ -354,6 +357,14 @@ parameter_types! {
 	pub const AttributeDepositBase: Balance = 10 * DOLLARS;
 	pub const DepositPerByte: Balance = DOLLARS;
 	pub const UniquesStringLimit: u32 = 128;
+	pub const MaxPartsPerBase: u32 = 100;
+	pub const MaxPropertiesPerTheme: u32 = 100;
+}
+
+impl pallet_rmrk_equip::Config for Runtime {
+	type Event = Event;
+	type MaxPartsPerBase = MaxPartsPerBase;
+	type MaxPropertiesPerTheme = MaxPropertiesPerTheme;
 }
 
 impl pallet_uniques::Config for Runtime {
@@ -397,6 +408,7 @@ construct_runtime!(
 		Sudo: pallet_sudo,
 		// Include the custom logic from the pallet-template in the runtime.
 		TemplateModule: pallet_template,
+		RmrkEquip: pallet_rmrk_equip::{Pallet, Call, Event<T>, Storage},
 		RmrkCore: pallet_rmrk_core::{Pallet, Call, Event<T>, Storage},
 		RmrkMarket: pallet_rmrk_market::{Pallet, Call, Storage, Event<T>},
 		PhalaWorld: pallet_phala_world::{Pallet, Call, Storage, Event<T>},
