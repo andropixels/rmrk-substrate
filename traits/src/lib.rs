@@ -8,6 +8,8 @@ pub mod priority;
 pub mod property;
 pub mod resource;
 pub mod theme;
+pub mod egg;
+pub mod preorders;
 
 pub use base::{Base, BaseInfo};
 pub use part::{EquippableList, FixedPart, PartType, SlotPart};
@@ -18,6 +20,9 @@ pub use nft::{AccountIdOrCollectionNftTuple, Nft, NftInfo};
 pub use priority::Priority;
 pub use property::Property;
 pub use resource::{Resource, ResourceInfo};
+pub use egg::{Egg, EggInfo};
+pub use preorders::PreorderInfo;
+
 pub mod primitives {
 	pub type CollectionId = u32;
 	pub type ResourceId = u32;
@@ -26,4 +31,9 @@ pub mod primitives {
 	pub type SlotId = u32;
 	pub type PartId = u32;
 	pub type ZIndex = u32;
+	pub type SerialId = u32;
+	pub type EraId = u128;
+	pub type EggType = u8;
+	pub type RaceType = u8;
+	pub type CareerType = u8;
 }

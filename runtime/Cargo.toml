@@ -54,6 +54,7 @@ pallet-template = { version = "0.0.1", default-features = false, path = "../pall
 pallet-rmrk-core = { version = "0.0.1", default-features = false, path = "../pallets/rmrk-core" }
 pallet-rmrk-equip = { version = "0.0.1", default-features = false, path = "../pallets/rmrk-equip" }
 pallet-rmrk-market = { version = "0.0.1", default-features = false, path = "../pallets/rmrk-market" }
+pallet-phala-world = { version = "4.0.0-dev", default-features = false, path = "../pallets/phala-world" }
 
 [build-dependencies]
 substrate-wasm-builder = { version = "5.0.0-dev", git = "https://github.com/paritytech/substrate.git", tag = "monthly-2022-01" }
@@ -101,6 +102,7 @@ runtime-benchmarks = [
 	"hex-literal",
 	"pallet-balances/runtime-benchmarks",
 	"pallet-template/runtime-benchmarks",
+	"pallet-phala-world/runtime-benchmarks",
 	"pallet-timestamp/runtime-benchmarks",
 	"sp-runtime/runtime-benchmarks",
 ]
