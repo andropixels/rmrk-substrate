@@ -114,7 +114,6 @@ impl StatusType {
 
 #[frame_support::pallet]
 pub mod pallet {
-	use std::os::linux::raw::stat;
 	use super::*;
 	use frame_support::{dispatch::DispatchResult, pallet_prelude::*};
 	use frame_system::pallet_prelude::*;
@@ -122,8 +121,6 @@ pub mod pallet {
 	use frame_support::sp_runtime::traits::Zero;
 	use frame_support::traits::{ExistenceRequirement, ReservableCurrency};
 	use frame_system::Origin;
-	use sp_core::sr25519::Signature;
-	use rmrk_traits::Nft;
 
 	type BalanceOf<T> =
 		<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
@@ -151,6 +148,12 @@ pub mod pallet {
 		/// Price of Normal Egg Price
 		#[pallet::constant]
 		type NormalEggPrice: Get<BalanceOf<Self>>;
+		/// Max mint per Race
+		#[pallet::constant]
+		type MaxMintPerRace: Get<u32>;
+		/// Max mint per Career
+		#[pallet::constant]
+		type MaxMintPerCareer: Get<u32>;
 	}
 
 	#[pallet::pallet]

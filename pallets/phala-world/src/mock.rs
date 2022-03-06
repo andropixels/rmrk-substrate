@@ -148,6 +148,8 @@ parameter_types! {
 	pub const FounderEggPrice: Balance = 1_000 * PHA;
 	pub const LegendaryEggPrice: Balance = 100 * PHA;
 	pub const NormalEggPrice: Balance = 10 * PHA;
+	pub const MaxMintPerRace: u32 = 2;
+	pub const MaxMintPerCareer: u32 = 2;
 }
 
 impl Config for Test {
@@ -158,6 +160,8 @@ impl Config for Test {
 	type FounderEggPrice = FounderEggPrice;
 	type LegendaryEggPrice = LegendaryEggPrice;
 	type NormalEggPrice = NormalEggPrice;
+	type MaxMintPerRace = MaxMintPerRace;
+	type MaxMintPerCareer = MaxMintPerCareer;
 }
 
 pub type SystemCall = frame_system::Call<Test>;

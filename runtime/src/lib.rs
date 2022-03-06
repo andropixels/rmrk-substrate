@@ -318,6 +318,9 @@ parameter_types! {
 	pub const FounderEggPrice: Balance = 10_000 * DOLLARS;
     pub const LegendaryEggPrice: Balance = 1_000 * DOLLARS;
 	pub const NormalEggPrice: Balance = 100 * DOLLARS;
+	// Subject to change
+	pub const MaxMintPerRace: u32 = 1_000;
+	pub const MaxMintPerCareer: u32 = 1_000;
 }
 impl pallet_phala_world::Config for Runtime {
 	type Event = Event;
@@ -327,6 +330,8 @@ impl pallet_phala_world::Config for Runtime {
 	type FounderEggPrice = FounderEggPrice;
 	type LegendaryEggPrice = LegendaryEggPrice;
 	type NormalEggPrice = NormalEggPrice;
+	type MaxMintPerRace = MaxMintPerRace;
+	type MaxMintPerCareer = MaxMintPerCareer;
 }
 
 parameter_types! {
