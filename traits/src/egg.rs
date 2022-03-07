@@ -8,29 +8,30 @@ use serde::{Deserialize, Serialize};
 use sp_std::result::Result;
 
 // Egg Types of Normal, Legendary & Founder
-// #[derive(Encode, Decode, Clone, PartialEq, TypeInfo)]
-// pub enum EggType {
-// 	Normal = 0,
-// 	Legendary = 1,
-// 	Founder = 2,
-// }
-//
-// impl Default for EggType {
-// 	fn default() -> Self {
-// 		EggType::Normal
-// 	}
-// }
-//
-// impl EggType {
-// 	pub fn from_u8(value: u8) -> EggType {
-// 		match value {
-// 			0 => EggType::Normal,
-// 			1 => EggType::Legendary,
-// 			2 => EggType::Founder,
-// 			_ => EggType::Normal,
-// 		}
-// 	}
-// }
+#[derive(Encode, Decode, Clone, Eq, PartialEq, RuntimeDebug, TypeInfo)]
+#[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
+pub enum EggType {
+	Normal,
+	Legendary,
+	Founder,
+}
+
+impl Default for EggType {
+	fn default() -> Self {
+		EggType::Normal
+	}
+}
+
+impl EggType {
+	pub fn from_u8(value: u8) -> EggType {
+		match value {
+			0 => EggType::Normal,
+			1 => EggType::Legendary,
+			2 => EggType::Founder,
+			_ => EggType::Normal,
+		}
+	}
+}
 //
 // // Four Races to choose from
 // #[derive(Encode, Decode, Clone, PartialEq, TypeInfo)]

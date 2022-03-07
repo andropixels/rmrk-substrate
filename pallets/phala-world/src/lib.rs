@@ -11,7 +11,6 @@ use sp_io::crypto::sr25519_verify;
 use codec::{Decode, Encode};
 use sp_runtime::DispatchResult;
 use sp_std::prelude::*;
-use sp_std::result::Result;
 use scale_info::TypeInfo;
 
 pub use pallet_rmrk_core::types::*;
@@ -20,6 +19,8 @@ pub use pallet_rmrk_market;
 use rmrk_traits::{
 	EggInfo,
 	PreorderInfo,
+	egg::EggType,
+	status_type::StatusType,
 	primitives::*,
 };
 
@@ -41,31 +42,6 @@ pub const EGGS_COLLECTION_ID: u32 = 1;
 /// Constant for amount of time it takes for an Egg to hatch after hatching is started
 pub const HATCHING_DURATION: u64 = 1_000_000;
 
-// Egg Types of Normal, Legendary & Founder
-// #[derive(Encode, Decode, Copy, Clone, PartialEq)]
-// pub enum EggType {
-// 	Normal = 0,
-// 	Legendary = 1,
-// 	Founder = 2,
-// }
-//
-// impl Default for EggType {
-// 	fn default() -> Self {
-// 		EggType::Normal
-// 	}
-// }
-//
-// impl EggType {
-// 	pub fn from_u8(value: u8) -> EggType {
-// 		match value {
-// 			0 => EggType::Normal,
-// 			1 => EggType::Legendary,
-// 			2 => EggType::Founder,
-// 			_ => EggType::Normal,
-// 		}
-// 	}
-// }
-
 // Four Races to choose from
 //#[derive(Encode, Decode, Clone, PartialEq)]
 //pub enum RaceType {
@@ -84,23 +60,6 @@ pub const HATCHING_DURATION: u64 = 1_000_000;
 //	HackerWizard = 3,
 //	Web3Monk = 4,
 //}
-#[derive(Encode, Decode, Debug, Clone, PartialEq, TypeInfo)]
-pub enum StatusType {
-	ClaimSpirits = 0,
-	PurchaseRareEggs = 1,
-	PreorderEggs = 2,
-}
-
-impl StatusType {
-	pub fn from_u8(value: u8) -> Option<StatusType> {
-		match value {
-			0 => Some(StatusType::ClaimSpirits),
-			1 => Some(StatusType::PurchaseRareEggs),
-			2 => Some(StatusType::PreorderEggs),
-			_ => None,
-		}
-	}
-}
 
 // #[cfg(feature = "std")]
 // use serde::{Deserialize, Serialize};
@@ -406,6 +365,7 @@ pub mod pallet {
 		CareerAndRaceAlreadyChosen,
 		OverlordNotSet,
 		RequireOverlordAccount,
+		InvalidStatusType,
 	}
 
 	// Dispatchable functions allows users to interact with the pallet and invoke state changes.
@@ -500,10 +460,10 @@ pub mod pallet {
 				Some(overlord) => {
 					// Get Egg Price based on EggType
 					let egg_price = match egg_type {
-						2 => {
+						EggType::Founder => {
 							T::FounderEggPrice::get()
 						},
-						1 => {
+						EggType::Legendary => {
 							T::LegendaryEggPrice::get()
 						},
 						_ => T::NormalEggPrice::get(),
