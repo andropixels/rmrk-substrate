@@ -1,12 +1,9 @@
 use crate::{mock::*, Error};
 use frame_support::{assert_noop, assert_ok, error::BadOrigin};
-use sp_core::crypto::AccountId32;
-use sp_core::Pair;
+use sp_core::{crypto::AccountId32, Pair};
 
 use super::*;
-use mock::{
-	Event as MockEvent, ExtBuilder, Balances, Call, PhalaWorld, Origin, Test,
-};
+use mock::{Balances, Call, Event as MockEvent, ExtBuilder, Origin, PhalaWorld, Test};
 
 /// Turns a string into a BoundedVec
 fn stb(s: &str) -> BoundedVec<u8, UniquesStringLimit> {
@@ -40,7 +37,11 @@ fn claimed_spirit_works() {
 		let overlord_pair = sr25519::Pair::from_seed(b"12345678901234567890123456789012");
 		// let overlord_pub = overlord_pair.public();
 		// Enable spirits to be claimed
-		assert_ok!(PhalaWorld::set_status_type(Origin::signed(ALICE), true, StatusType::ClaimSpirits));
+		assert_ok!(PhalaWorld::set_status_type(
+			Origin::signed(ALICE),
+			true,
+			StatusType::ClaimSpirits
+		));
 
 		let metadata = stb("I am Overlord");
 		let claim = Encode::encode(&(BOB, metadata.clone()));
@@ -72,11 +73,23 @@ fn claimed_spirit_twice_fails() {
 		// Mint Spirits collection
 		mint_collection(BOB);
 		// Enable spirits to be claimed
-		assert_ok!(PhalaWorld::set_status_type(Origin::signed(BOB), true, StatusType::ClaimSpirits));
+		assert_ok!(PhalaWorld::set_status_type(
+			Origin::signed(BOB),
+			true,
+			StatusType::ClaimSpirits
+		));
 		// Dispatch a claim spirit from ALICE's account
-		assert_ok!(PhalaWorld::claim_spirit(Origin::signed(ALICE), 1, overlord_signature.clone(), metadata.clone()));
+		assert_ok!(PhalaWorld::claim_spirit(
+			Origin::signed(ALICE),
+			1,
+			overlord_signature.clone(),
+			metadata.clone()
+		));
 		// Fail to dispatch a second claim spirit
-		assert_noop!(PhalaWorld::claim_spirit(Origin::signed(ALICE), 1, overlord_signature, metadata), Error::<Test>::SpiritAlreadyClaimed);
+		assert_noop!(
+			PhalaWorld::claim_spirit(Origin::signed(ALICE), 1, overlord_signature, metadata),
+			Error::<Test>::SpiritAlreadyClaimed
+		);
 	});
 }
 
@@ -107,10 +120,7 @@ fn auto_increment_era_works() {
 		// Check Era is 1
 		assert_eq!(PhalaWorld::era(), 1);
 		// Check if event triggered
-		System::assert_last_event(MockEvent::PhalaWorld(crate::Event::NewEra {
-			time: 6,
-			era: 1,
-		}));
+		System::assert_last_event(MockEvent::PhalaWorld(crate::Event::NewEra { time: 6, era: 1 }));
 	});
 }
 
@@ -120,7 +130,11 @@ fn preorder_egg_works() {
 		// Set the Overlord Admin account
 		assert_ok!(PhalaWorld::set_overlord(Origin::root(), ALICE));
 		// Enable preorder of eggs
-		assert_ok!(PhalaWorld::set_status_type(Origin::signed(ALICE), true, StatusType::PreorderEggs));
+		assert_ok!(PhalaWorld::set_status_type(
+			Origin::signed(ALICE),
+			true,
+			StatusType::PreorderEggs
+		));
 		// BOB preorders an egg
 		assert_ok!(PhalaWorld::preorder_egg(Origin::signed(BOB), 0u8, 0u8));
 		// Check if event triggered

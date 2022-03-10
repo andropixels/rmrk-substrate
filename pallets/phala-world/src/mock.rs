@@ -2,21 +2,19 @@ use super::*;
 use crate as pallet_phala_world;
 
 use frame_support::{
-	construct_runtime,
-	parameter_types,
-	traits::{ConstU32, ConstU64, Everything, OnFinalize, OnInitialize, GenesisBuild},
-	weights::Weight
+	construct_runtime, parameter_types,
+	traits::{ConstU32, ConstU64, Everything, GenesisBuild, OnFinalize, OnInitialize},
+	weights::Weight,
 };
 use frame_system as system;
-use frame_system::{EnsureRoot};
-use sp_core::{crypto::AccountId32, H256, Pair, Public};
-use sp_core::sr25519::{Signature};
+use frame_system::EnsureRoot;
+use sp_core::{crypto::AccountId32, sr25519::Signature, Pair, Public, H256};
 
+use rmrk_traits::AccountIdOrCollectionNftTuple;
 use sp_runtime::{
 	testing::Header,
 	traits::{BlakeTwo256, IdentityLookup},
 };
-use rmrk_traits::AccountIdOrCollectionNftTuple;
 
 type AccountId = AccountId32;
 type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
@@ -176,8 +174,14 @@ pub fn fast_forward_to(n: u64) {
 	}
 }
 
-pub const ALICE: AccountId = AccountId::new([116, 28, 8, 160, 111, 65, 197, 150, 96, 143, 103, 116, 37, 155, 217, 4, 51, 4, 173, 250, 93, 62, 234, 98, 118, 11, 217, 190, 151, 99, 77, 99]);
-pub const BOB: AccountId = AccountId::new([250, 140, 153, 155, 88, 13, 83, 23, 193, 161, 236, 241, 58, 213, 107, 213, 230, 33, 38, 154, 78, 125, 67, 186, 54, 157, 62, 131, 179, 150, 232, 82]);
+pub const ALICE: AccountId = AccountId::new([
+	116, 28, 8, 160, 111, 65, 197, 150, 96, 143, 103, 116, 37, 155, 217, 4, 51, 4, 173, 250, 93,
+	62, 234, 98, 118, 11, 217, 190, 151, 99, 77, 99,
+]);
+pub const BOB: AccountId = AccountId::new([
+	250, 140, 153, 155, 88, 13, 83, 23, 193, 161, 236, 241, 58, 213, 107, 213, 230, 33, 38, 154,
+	78, 125, 67, 186, 54, 157, 62, 131, 179, 150, 232, 82,
+]);
 pub const CHARLIE: AccountId = AccountId::new([3u8; 32]);
 pub const PHA: Balance = 1;
 pub const UNITS: Balance = 100_000_000_000;
@@ -206,10 +210,10 @@ impl ExtBuilder {
 			era: 0,
 			can_claim_spirits: false,
 			can_purchase_rare_eggs: false,
-			can_preorder_eggs: false
+			can_preorder_eggs: false,
 		}
-			.assimilate_storage(&mut t)
-			.unwrap();
+		.assimilate_storage(&mut t)
+		.unwrap();
 
 		pallet_balances::GenesisConfig::<Test> {
 			balances: vec![
@@ -218,8 +222,8 @@ impl ExtBuilder {
 				(CHARLIE, 150_000 * PHA),
 			],
 		}
-			.assimilate_storage(&mut t)
-			.unwrap();
+		.assimilate_storage(&mut t)
+		.unwrap();
 
 		let mut ext = sp_io::TestExternalities::new(t);
 		ext.execute_with(|| System::set_block_number(1));
