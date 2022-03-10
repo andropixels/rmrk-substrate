@@ -72,7 +72,7 @@ pub mod pallet {
 		traits::{ExistenceRequirement, ReservableCurrency},
 	};
 	use frame_system::{pallet_prelude::*, Origin};
-	use sp_runtime::traits::StaticLookup;
+	use sp_runtime::traits::{One, StaticLookup};
 
 	type BalanceOf<T> =
 		<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
@@ -124,10 +124,15 @@ pub mod pallet {
 	#[pallet::getter(fn claimed_eggs)]
 	pub type ClaimedEggs<T: Config> = StorageMap<_, Twox64Concat, SerialId, bool>;
 
-	/// Preorder info vector for Accounts
+	/// Preorder index that is the key to the Preorders StorageMap
+	#[pallet::storage]
+	#[pallet::getter(fn preorder_index)]
+	pub type PreorderIndex<T: Config> = StorageValue<_, PreorderId, ValueQuery>;
+
+	/// Preorder info map for user preorders
 	#[pallet::storage]
 	#[pallet::getter(fn preorders)]
-	pub type Preorders<T: Config> = StorageValue<_, Vec<PreorderInfoOf<T>>, ValueQuery>;
+	pub type Preorders<T: Config> = StorageMap<_, Twox64Concat, PreorderId, PreorderInfoOf<T>>;
 
 	/// Stores all the Eggs and the information about the Egg pertaining to Hatch times and feeding
 	#[pallet::storage]
@@ -176,9 +181,10 @@ pub mod pallet {
 			if let Some(zero_day) = <ZeroDay<T>>::get() {
 				let blocks_since_zero_day = n - zero_day;
 				if (blocks_since_zero_day % T::BlocksPerEra::get()).is_zero() {
-					let mut current_era = <Era<T>>::get();
-					current_era = current_era.saturating_add(1u64);
-					<Era<T>>::put(current_era);
+					let current_era = Era::<T>::mutate(|era| {
+						*era = era.saturating_add(One::one());
+						*era
+					});
 					Self::deposit_event(Event::NewEra { time: n, era: current_era });
 				}
 			}
@@ -262,6 +268,7 @@ pub mod pallet {
 		/// A chance to get an egg through preorder
 		EggPreordered {
 			owner: T::AccountId,
+			preorder_id: PreorderId,
 		},
 		/// Egg claimed from the winning preorder
 		EggClaimed {
@@ -343,6 +350,7 @@ pub mod pallet {
 		ClaimIsOver,
 		InsufficientFunds,
 		InvalidPurchase,
+		NoAvailablePreorderId,
 		InvalidClaimTicket,
 		CannotHatchEgg,
 		CannotSendFoodToEgg,
@@ -383,36 +391,31 @@ pub mod pallet {
 		) -> DispatchResult {
 			ensure!(CanClaimSpirits::<T>::get(), Error::<T>::ClaimIsOver);
 			let sender = ensure_signed(origin)?;
-			let overlord = <Overlord<T>>::get();
-			match overlord {
-				None => Err(Error::<T>::OverlordNotSet.into()),
-				Some(overlord) => {
-					// Has the SerialId already been claimed
-					ensure!(
-						!ClaimedSpirits::<T>::contains_key(serial_id),
-						Error::<T>::SpiritAlreadyClaimed
-					);
-					// Check if valid SerialId to claim a spirit
-					ensure!(
-						Self::verify_claim(sender.clone(), metadata.clone(), signature),
-						Error::<T>::ClaimVerificationFailed
-					);
-					// Mint new Spirit and transfer to sender
-					pallet_rmrk_core::Pallet::<T>::mint_nft(
-						Origin::<T>::Signed(overlord).into(),
-						sender.clone(),
-						SPIRIT_COLLECTION_ID,
-						None,
-						None,
-						metadata,
-					)?;
-					ClaimedSpirits::<T>::insert(serial_id, true);
+			let overlord = Overlord::<T>::get().ok_or(Error::<T>::OverlordNotSet)?;
+			// Has the SerialId already been claimed
+			ensure!(
+				!ClaimedSpirits::<T>::contains_key(serial_id),
+				Error::<T>::SpiritAlreadyClaimed
+			);
+			// Check if valid SerialId to claim a spirit
+			ensure!(
+				Self::verify_claim(sender.clone(), metadata.clone(), signature),
+				Error::<T>::ClaimVerificationFailed
+			);
+			// Mint new Spirit and transfer to sender
+			pallet_rmrk_core::Pallet::<T>::mint_nft(
+				Origin::<T>::Signed(overlord).into(),
+				sender.clone(),
+				SPIRIT_COLLECTION_ID,
+				None,
+				None,
+				metadata,
+			)?;
+			ClaimedSpirits::<T>::insert(serial_id, true);
 
-					Self::deposit_event(Event::SpiritClaimed { serial_id, owner: sender });
+			Self::deposit_event(Event::SpiritClaimed { serial_id, owner: sender });
 
-					Ok(())
-				},
-			}
+			Ok(())
 		}
 
 		/// Buy a rare egg of either type Legendary or Founder. Both Egg types will have a set
@@ -434,48 +437,41 @@ pub mod pallet {
 		) -> DispatchResult {
 			ensure!(CanPurchaseRareEggs::<T>::get(), Error::<T>::RareEggPurchaseNotAvailable);
 			let sender = ensure_signed(origin.clone())?;
-			let overlord = <Overlord<T>>::get();
-			match overlord {
-				None => Err(Error::<T>::OverlordNotSet.into()),
-				Some(overlord) => {
-					// Get Egg Price based on EggType
-					let egg_price = match egg_type {
-						EggType::Founder => T::FounderEggPrice::get(),
-						EggType::Legendary => T::LegendaryEggPrice::get(),
-						_ => T::NormalEggPrice::get(),
-					};
-					ensure!(egg_price != T::NormalEggPrice::get(), Error::<T>::InvalidPurchase);
-					let nft_id = pallet_rmrk_core::NextNftId::<T>::get(EGGS_COLLECTION_ID);
-					// Transfer the amount for the rare Egg NFT then mint the egg
-					<T as pallet::Config>::Currency::transfer(
-						&sender,
-						&overlord,
-						egg_price,
-						ExistenceRequirement::KeepAlive,
-					)?;
-					// Mint Egg and transfer Egg to new owner
-					pallet_rmrk_core::Pallet::<T>::mint_nft(
-						Origin::<T>::Signed(overlord.clone()).into(),
-						sender.clone(),
-						EGGS_COLLECTION_ID,
-						None,
-						None,
-						metadata,
-					)?;
-					// Add EggInfo to storage
-					let egg =
-						EggInfo { egg_type, race, career, start_hatching: 0, hatching_duration: 0 };
-					Eggs::<T>::insert(EGGS_COLLECTION_ID, nft_id, egg);
+			let overlord = Overlord::<T>::get().ok_or(Error::<T>::OverlordNotSet)?;
+			// Get Egg Price based on EggType
+			let egg_price = match egg_type {
+				EggType::Founder => T::FounderEggPrice::get(),
+				EggType::Legendary => T::LegendaryEggPrice::get(),
+				_ => return Err(Error::<T>::InvalidPurchase.into()),
+			};
+			let nft_id = pallet_rmrk_core::NextNftId::<T>::get(EGGS_COLLECTION_ID);
+			// Transfer the amount for the rare Egg NFT then mint the egg
+			<T as pallet::Config>::Currency::transfer(
+				&sender,
+				&overlord,
+				egg_price,
+				ExistenceRequirement::KeepAlive,
+			)?;
+			// Mint Egg and transfer Egg to new owner
+			pallet_rmrk_core::Pallet::<T>::mint_nft(
+				Origin::<T>::Signed(overlord.clone()).into(),
+				sender.clone(),
+				EGGS_COLLECTION_ID,
+				None,
+				None,
+				metadata,
+			)?;
+			// Add EggInfo to storage
+			let egg = EggInfo { egg_type, race, career, start_hatching: 0, hatching_duration: 0 };
+			Eggs::<T>::insert(EGGS_COLLECTION_ID, nft_id, egg);
 
-					Self::deposit_event(Event::RareEggPurchased {
-						collection_id: EGGS_COLLECTION_ID,
-						nft_id,
-						owner: sender,
-					});
+			Self::deposit_event(Event::RareEggPurchased {
+				collection_id: EGGS_COLLECTION_ID,
+				nft_id,
+				owner: sender,
+			});
 
-					Ok(())
-				},
-			}
+			Ok(())
 		}
 
 		/// Users can pre-order an egg. This will enable users that are whitelisted to be
@@ -496,14 +492,21 @@ pub mod pallet {
 		) -> DispatchResult {
 			ensure!(CanPreorderEggs::<T>::get(), Error::<T>::PreorderEggNotAvailable);
 			let sender = ensure_signed(origin)?;
+			let preorder_id =
+				<PreorderIndex<T>>::try_mutate(|n| -> Result<PreorderId, DispatchError> {
+					let id = *n;
+					ensure!(id != PreorderId::max_value(), Error::<T>::NoAvailablePreorderId);
+					*n = n.saturating_add(One::one());
+					Ok(id)
+				})?;
 
 			// Reserve currency for the preorder at the Normal egg price
 			<T as pallet::Config>::Currency::reserve(&sender, T::NormalEggPrice::get())?;
 
 			let preorder = PreorderInfo { owner: sender.clone(), race, career };
-			<Preorders<T>>::get().push(preorder.into());
+			Preorders::<T>::insert(preorder_id, preorder);
 
-			Self::deposit_event(Event::EggPreordered { owner: sender });
+			Self::deposit_event(Event::EggPreordered { owner: sender, preorder_id });
 
 			Ok(())
 		}
@@ -516,10 +519,7 @@ pub mod pallet {
 		pub fn mint_eggs(origin: OriginFor<T>) -> DispatchResult {
 			// Ensure Overlord account makes call
 			let sender = ensure_signed(origin)?;
-			ensure!(
-				Self::overlord().map_or(false, |k| sender == k),
-				Error::<T>::RequireOverlordAccount
-			);
+			Self::ensure_overlord(sender)?;
 
 			Ok(())
 		}
@@ -615,12 +615,13 @@ pub mod pallet {
 			reduced_time: u64,
 		) -> DispatchResult {
 			// Ensure OverlordOrigin makes call
-			T::OverlordOrigin::ensure_origin(origin)?;
+			let sender = ensure_signed(origin)?;
+			Self::ensure_overlord(sender)?;
 
 			Ok(())
 		}
 
-		/// Priveleged function set the Overlord Admin account of Phala World
+		/// Privileged function set the Overlord Admin account of Phala World
 		///
 		/// Parameters:
 		/// - origin: Expected to be called by `OverlordOrigin`
@@ -628,11 +629,10 @@ pub mod pallet {
 		#[pallet::weight(0)]
 		pub fn set_overlord(
 			origin: OriginFor<T>,
-			new_overlord: <T::Lookup as StaticLookup>::Source,
+			new_overlord: T::AccountId,
 		) -> DispatchResultWithPostInfo {
 			// This is a public call, so we ensure that the origin is some signed account.
 			ensure_root(origin)?;
-			let new_overlord = T::Lookup::lookup(new_overlord)?;
 			let old_overlord = <Overlord<T>>::get();
 
 			Overlord::<T>::put(&new_overlord);
@@ -650,10 +650,7 @@ pub mod pallet {
 		pub fn initialize_world_clock(origin: OriginFor<T>) -> DispatchResultWithPostInfo {
 			// Ensure Overlord account makes call
 			let sender = ensure_signed(origin)?;
-			ensure!(
-				Self::overlord().map_or(false, |k| sender == k),
-				Error::<T>::RequireOverlordAccount
-			);
+			Self::ensure_overlord(sender)?;
 			// Ensure ZeroDay is None as this can only be set once
 			ensure!(Self::zero_day() == None, Error::<T>::WorldClockAlreadySet);
 
@@ -680,10 +677,7 @@ pub mod pallet {
 		) -> DispatchResultWithPostInfo {
 			// Ensure Overlord account makes call
 			let sender = ensure_signed(origin)?;
-			ensure!(
-				Self::overlord().map_or(false, |k| sender == k),
-				Error::<T>::RequireOverlordAccount
-			);
+			Self::ensure_overlord(sender)?;
 			// Match StatusType and call helper function to set status
 			match status_type {
 				StatusType::ClaimSpirits => Self::set_claim_spirits_status(status)?,
@@ -720,6 +714,18 @@ impl<T: Config> Pallet<T> {
 		} else {
 			false
 		}
+	}
+
+	/// Helper function to ensure Overlord account is the sender
+	///
+	/// Parameters:
+	/// - `sender`: Account origin that made the call to check if Overlord account
+	fn ensure_overlord(sender: T::AccountId) -> DispatchResult {
+		ensure!(
+			Self::overlord().map_or(false, |k| sender == k),
+			Error::<T>::RequireOverlordAccount
+		);
+		Ok(())
 	}
 
 	/// Set Spirit Claims with the Overlord admin Account to allow users to claim their

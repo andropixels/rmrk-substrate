@@ -33,6 +33,7 @@ pub mod primitives {
 	pub type PartId = u32;
 	pub type ZIndex = u32;
 	pub type SerialId = u32;
+	pub type PreorderId = u32;
 	pub type EraId = u128;
 	pub type RaceType = u8;
 	pub type CareerType = u8;
