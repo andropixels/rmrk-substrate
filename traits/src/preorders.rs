@@ -3,7 +3,7 @@ use scale_info::TypeInfo;
 use sp_runtime::RuntimeDebug;
 use sp_std::cmp::Eq;
 
-use crate::primitives::*;
+use crate::{career::CareerType, race::RaceType};
 use serde::{Deserialize, Serialize};
 
 #[derive(Encode, Decode, Eq, PartialEq, Clone, RuntimeDebug, TypeInfo)]

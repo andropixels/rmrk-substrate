@@ -7,13 +7,19 @@ use codec::{Decode, Encode};
 use scale_info::TypeInfo;
 use sp_core::{sr25519, H256};
 use sp_io::crypto::sr25519_verify;
-use sp_runtime::DispatchResult;
+use sp_runtime::{
+	traits::{One, StaticLookup},
+	DispatchResult,
+};
 use sp_std::prelude::*;
 
 pub use pallet_rmrk_core::types::*;
 pub use pallet_rmrk_market;
 
-use rmrk_traits::{egg::EggType, primitives::*, status_type::StatusType, EggInfo, PreorderInfo};
+use rmrk_traits::{
+	career::CareerType, egg::EggType, primitives::*, race::RaceType, status_type::StatusType,
+	EggInfo, PreorderInfo,
+};
 
 #[cfg(test)]
 mod mock;
@@ -32,25 +38,6 @@ pub const SPIRIT_COLLECTION_ID: u32 = 0;
 pub const EGGS_COLLECTION_ID: u32 = 1;
 /// Constant for amount of time it takes for an Egg to hatch after hatching is started
 pub const HATCHING_DURATION: u64 = 1_000_000;
-
-// Four Races to choose from
-//#[derive(Encode, Decode, Clone, PartialEq)]
-//pub enum RaceType {
-//	Cyborg = 0,
-//	AISpectre = 1,
-//	XGene = 2,
-//	Pandroid = 3,
-//}
-
-// Five Careers to choose from
-//#[derive(Encode, Decode, Clone, PartialEq)]
-//pub enum CareerType {
-//	HardwareDruid = 0,
-//	RoboWarrior = 1,
-//	TradeNegotiator = 2,
-//	HackerWizard = 3,
-//	Web3Monk = 4,
-//}
 
 // #[cfg(feature = "std")]
 // use serde::{Deserialize, Serialize};
@@ -72,7 +59,6 @@ pub mod pallet {
 		traits::{ExistenceRequirement, ReservableCurrency},
 	};
 	use frame_system::{pallet_prelude::*, Origin};
-	use sp_runtime::traits::{One, StaticLookup};
 
 	type BalanceOf<T> =
 		<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
@@ -169,6 +155,16 @@ pub mod pallet {
 	#[pallet::storage]
 	#[pallet::getter(fn can_preorder_eggs)]
 	pub type CanPreorderEggs<T: Config> = StorageValue<_, bool, ValueQuery>;
+
+	/// Race Type count
+	#[pallet::storage]
+	#[pallet::getter(fn race_type_count)]
+	pub type RaceTypeCount<T: Config> = StorageMap<_, Twox64Concat, RaceType, u32, ValueQuery>;
+
+	/// Race StorageMap count
+	#[pallet::storage]
+	#[pallet::getter(fn career_type_count)]
+	pub type CareerTypeCount<T: Config> = StorageMap<_, Twox64Concat, CareerType, u32, ValueQuery>;
 
 	/// Overlord Admin account of Phala World
 	#[pallet::storage]
@@ -462,8 +458,16 @@ pub mod pallet {
 				metadata,
 			)?;
 			// Add EggInfo to storage
-			let egg = EggInfo { egg_type, race, career, start_hatching: 0, hatching_duration: 0 };
+			let egg = EggInfo {
+				egg_type,
+				race: race.clone(),
+				career: career.clone(),
+				start_hatching: 0,
+				hatching_duration: 0,
+			};
 			Eggs::<T>::insert(EGGS_COLLECTION_ID, nft_id, egg);
+			Self::increment_race_type(race);
+			Self::increment_career_type(career);
 
 			Self::deposit_event(Event::RareEggPurchased {
 				collection_id: EGGS_COLLECTION_ID,
@@ -520,6 +524,18 @@ pub mod pallet {
 			// Ensure Overlord account makes call
 			let sender = ensure_signed(origin)?;
 			Self::ensure_overlord(sender)?;
+			// Get the current PreorderId
+			let current_preorder_id = PreorderIndex::<T>::get();
+			for preorder_id in 0..current_preorder_id {
+				if let Some(preorder) = Preorders::<T>::take(preorder_id) {
+					let egg_owner = preorder.owner.clone();
+					let egg_type = EggType::Normal;
+					let egg_race = preorder.race;
+					let egg_career = preorder.career;
+
+					// Get payment from owner's reserve
+				}
+			}
 
 			Ok(())
 		}
@@ -766,4 +782,36 @@ impl<T: Config> Pallet<T> {
 
 		Ok(())
 	}
+
+	/// Increment RaceType count for the `race`
+	///
+	/// Parameters:
+	/// - `race`: The Race to increment count
+	fn increment_race_type(race: RaceType) -> DispatchResult {
+		RaceTypeCount::<T>::mutate(race, |race_count| {
+			*race_count = race_count.saturating_add(One::one());
+			*race_count
+		});
+
+		Ok(())
+	}
+
+	/// Increment CareerType count for the `career`
+	///
+	/// Parameters:
+	/// - `career`: The Career to increment count
+	fn increment_career_type(career: CareerType) -> DispatchResult {
+		CareerTypeCount::<T>::mutate(career, |career_count| {
+			*career_count = career_count.saturating_add(One::one());
+			*career_count
+		});
+
+		Ok(())
+	}
+
+	// Verify if the preorder has chosen a Race and Career that have not reached the max limit
+	//
+	// Parameters:
+	// - `race`: The Race chosen by the preorder
+	// - `career`: The Career chosen by the preorder
 }

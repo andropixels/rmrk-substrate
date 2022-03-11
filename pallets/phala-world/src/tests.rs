@@ -136,14 +136,22 @@ fn preorder_egg_works() {
 			StatusType::PreorderEggs
 		));
 		// BOB preorders an egg
-		assert_ok!(PhalaWorld::preorder_egg(Origin::signed(BOB), 0u8, 0u8));
+		assert_ok!(PhalaWorld::preorder_egg(
+			Origin::signed(BOB),
+			RaceType::Cyborg,
+			CareerType::HardwareDruid
+		));
 		// Check if event triggered
 		System::assert_last_event(MockEvent::PhalaWorld(crate::Event::EggPreordered {
 			owner: BOB,
 			preorder_id: 0,
 		}));
 		// ALICE preorders an egg
-		assert_ok!(PhalaWorld::preorder_egg(Origin::signed(ALICE), 0u8, 0u8));
+		assert_ok!(PhalaWorld::preorder_egg(
+			Origin::signed(ALICE),
+			RaceType::Pandroid,
+			CareerType::HardwareDruid
+		));
 		// Check if event triggered
 		System::assert_last_event(MockEvent::PhalaWorld(crate::Event::EggPreordered {
 			owner: ALICE,
@@ -153,7 +161,11 @@ fn preorder_egg_works() {
 		PreorderIndex::<Test>::mutate(|id| *id = PreorderId::max_value());
 		// CHARLIE preorders an egg but max value is reached
 		assert_noop!(
-			PhalaWorld::preorder_egg(Origin::signed(CHARLIE), 1u8, 1u8),
+			PhalaWorld::preorder_egg(
+				Origin::signed(CHARLIE),
+				RaceType::Cyborg,
+				CareerType::HackerWizard
+			),
 			Error::<Test>::NoAvailablePreorderId
 		);
 	});

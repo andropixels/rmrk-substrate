@@ -3,7 +3,7 @@ use scale_info::TypeInfo;
 use sp_runtime::{DispatchError, RuntimeDebug};
 use sp_std::cmp::Eq;
 
-use crate::primitives::*;
+use crate::{career::CareerType, primitives::*, race::RaceType};
 use serde::{Deserialize, Serialize};
 use sp_std::result::Result;
 
@@ -15,65 +15,6 @@ pub enum EggType {
 	Legendary,
 	Founder,
 }
-
-impl Default for EggType {
-	fn default() -> Self {
-		EggType::Normal
-	}
-}
-
-impl EggType {
-	pub fn from_u8(value: u8) -> EggType {
-		match value {
-			0 => EggType::Normal,
-			1 => EggType::Legendary,
-			2 => EggType::Founder,
-			_ => EggType::Normal,
-		}
-	}
-}
-//
-// // Four Races to choose from
-// #[derive(Encode, Decode, Clone, PartialEq, TypeInfo)]
-// pub enum RaceType {
-// 	Cyborg = 0,
-// 	AI = 1,
-// 	Devil = 2,
-// 	Robot = 3,
-// }
-//
-// impl RaceType {
-//     pub fn from_u8(value: u8) -> RaceType {
-//         match value {
-//             0 => RaceType::Cyborg,
-//             1 => RaceType::AI,
-//             2 => RaceType::Devil,
-//             3 => RaceType::Robot,
-//         }
-//     }
-// }
-//
-// // Five Careers to choose from
-// #[derive(Encode, Decode, Clone, PartialEq, TypeInfo)]
-// pub enum CareerType {
-// 	HardwareDruid = 0,
-// 	RoboWarrior = 1,
-// 	TradeNegotiator = 2,
-// 	HackerWizard = 3,
-// 	Web3Monk = 4,
-// }
-//
-// impl CareerType {
-//     pub fn from_u8(value: u8) -> CareerType {
-//         match value {
-//             0 => CareerType::HardwareDruid,
-//             1 => CareerType::RoboWarrior,
-//             2 => CareerType::TradeNegotiator,
-//             3 => CareerType::HackerWizard,
-//             4 => CareerType::Web3Monk,
-//         }
-//     }
-// }
 
 #[derive(Encode, Decode, Eq, PartialEq, Clone, RuntimeDebug, TypeInfo)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]

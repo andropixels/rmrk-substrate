@@ -1,6 +1,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 pub mod base;
+pub mod career;
 pub mod collection;
 pub mod egg;
 pub mod nft;
@@ -8,6 +9,7 @@ pub mod part;
 pub mod preorders;
 pub mod priority;
 pub mod property;
+pub mod race;
 pub mod resource;
 pub mod status_type;
 pub mod theme;
@@ -35,6 +37,4 @@ pub mod primitives {
 	pub type SerialId = u32;
 	pub type PreorderId = u32;
 	pub type EraId = u128;
-	pub type RaceType = u8;
-	pub type CareerType = u8;
 }
