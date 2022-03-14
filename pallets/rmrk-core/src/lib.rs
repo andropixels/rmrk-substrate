@@ -147,6 +147,7 @@ pub mod pallet {
 	>;
 
 	#[pallet::pallet]
+	#[pallet::without_storage_info]
 	#[pallet::generate_store(pub(super) trait Store)]
 	pub struct Pallet<T>(_);
 
@@ -307,8 +308,6 @@ pub mod pallet {
 		) -> DispatchResult {
 			let sender = ensure_signed(origin.clone())?;
 
-			let max = max.unwrap_or_default();
-
 			let collection_id = Self::collection_create(sender.clone(), metadata, max, symbol)?;
 
 			pallet_uniques::Pallet::<T>::do_create_class(
@@ -463,8 +462,7 @@ pub mod pallet {
 		) -> DispatchResult {
 			let sender = ensure_signed(origin.clone())?;
 
-			let (sender, collection_id, nft_id) =
-				Self::nft_reject(sender.clone(), collection_id, nft_id)?;
+			let (sender, collection_id, nft_id) = Self::nft_reject(sender, collection_id, nft_id)?;
 
 			Self::deposit_event(Event::NFTRejected { sender, collection_id, nft_id });
 			Ok(())
@@ -479,6 +477,9 @@ pub mod pallet {
 			new_issuer: <T::Lookup as StaticLookup>::Source,
 		) -> DispatchResult {
 			let sender = ensure_signed(origin.clone())?;
+			let collection =
+				Self::collections(collection_id).ok_or(Error::<T>::CollectionUnknown)?;
+			ensure!(collection.issuer == sender, Error::<T>::NoPermission);
 			let new_issuer = T::Lookup::lookup(new_issuer)?;
 
 			ensure!(

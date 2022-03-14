@@ -142,11 +142,16 @@ fn buy_works() {
 		}));
 		// Ensure that ALICE cannot buy the listed NFT
 		assert_noop!(
-			RmrkMarket::buy(Origin::signed(ALICE), COLLECTION_ID_0, NFT_ID_0,),
+			RmrkMarket::buy(Origin::signed(ALICE), COLLECTION_ID_0, NFT_ID_0, Some(10u128),),
 			Error::<Test>::CannotBuyOwnToken
 		);
+		// Ensure that ALICE cannot buy the listed NFT
+		assert_noop!(
+			RmrkMarket::buy(Origin::signed(BOB), COLLECTION_ID_0, NFT_ID_0, Some(9u128),),
+			Error::<Test>::PriceDiffersFromExpected
+		);
 		// BOB buys the NFT and the NFT is transferred from ALICE to BOB
-		assert_ok!(RmrkMarket::buy(Origin::signed(BOB), COLLECTION_ID_0, NFT_ID_0,));
+		assert_ok!(RmrkMarket::buy(Origin::signed(BOB), COLLECTION_ID_0, NFT_ID_0, Some(10u128),));
 		// Bought NFT should trigger TokenSold event
 		System::assert_last_event(MockEvent::RmrkMarket(crate::Event::TokenSold {
 			owner: ALICE,
@@ -190,7 +195,7 @@ fn buy_wont_work_after_list_expires() {
 		System::set_block_number(2);
 		// Ensure that BOB cannot buy the listed NFT as the listing expired
 		assert_noop!(
-			RmrkMarket::buy(Origin::signed(BOB), COLLECTION_ID_0, NFT_ID_0,),
+			RmrkMarket::buy(Origin::signed(BOB), COLLECTION_ID_0, NFT_ID_0, None,),
 			Error::<Test>::ListingHasExpired
 		);
 	});
@@ -224,12 +229,13 @@ fn send_wont_work_if_sent_after_list() {
 		}));
 		// Ensure that ALICE cannot buy the listed NFT
 		assert_noop!(
-			RmrkMarket::buy(Origin::signed(ALICE), COLLECTION_ID_0, NFT_ID_0,),
+			RmrkMarket::buy(Origin::signed(ALICE), COLLECTION_ID_0, NFT_ID_0, None,),
 			Error::<Test>::CannotBuyOwnToken
 		);
 		// TODO: NFT Lock Tests Ensure ALICE cannot sends CHARLIE NFT [0,0] bc it is now locked
-		// BOB buys the NFT and the NFT is transferred from ALICE to BOB
-		assert_ok!(RmrkMarket::buy(Origin::signed(BOB), COLLECTION_ID_0, NFT_ID_0,));
+		// BOB buys the NFT at whatever price is in storage and the NFT is transferred from ALICE to
+		// BOB
+		assert_ok!(RmrkMarket::buy(Origin::signed(BOB), COLLECTION_ID_0, NFT_ID_0, None,));
 		// Bought NFT should trigger TokenSold event
 		System::assert_last_event(MockEvent::RmrkMarket(crate::Event::TokenSold {
 			owner: ALICE,
@@ -272,12 +278,12 @@ fn send_to_nft_wont_work_after_list() {
 		}));
 		// Ensure that ALICE cannot buy the listed NFT
 		assert_noop!(
-			RmrkMarket::buy(Origin::signed(ALICE), COLLECTION_ID_0, NFT_ID_0,),
+			RmrkMarket::buy(Origin::signed(ALICE), COLLECTION_ID_0, NFT_ID_0, Some(10u128),),
 			Error::<Test>::CannotBuyOwnToken
 		);
 		// TODO: NFT Lock Tests ALICE sends NFT [0,0] to NFT [0,1] won't work
 		// BOB buys the NFT and the NFT is transferred from ALICE to BOB
-		assert_ok!(RmrkMarket::buy(Origin::signed(BOB), COLLECTION_ID_0, NFT_ID_0,));
+		assert_ok!(RmrkMarket::buy(Origin::signed(BOB), COLLECTION_ID_0, NFT_ID_0, Some(10u128),));
 		// Bought NFT should trigger TokenSold event
 		System::assert_last_event(MockEvent::RmrkMarket(crate::Event::TokenSold {
 			owner: ALICE,

@@ -86,6 +86,34 @@ fn create_collection_works() {
 	});
 }
 
+/// Collection: Creating collection with None max doesn't prevent NFTs from being minted
+#[test]
+fn create_collection_no_max_works() {
+	ExtBuilder::default().build().execute_with(|| {
+		// Create a collection with max of None
+		assert_ok!(
+			RMRKCore::create_collection(Origin::signed(ALICE), bvec![0u8; 20], None, bvec![0u8; 15])
+		);
+		// Creating collection should trigger CollectionCreated event
+		System::assert_last_event(MockEvent::RmrkCore(crate::Event::CollectionCreated {
+			issuer: ALICE,
+			collection_id: 0,
+		}));
+		// Mint 100 NFTs
+		for _ in 0..100 {
+			assert_ok!(
+				basic_mint()
+			);
+		}
+		// Last event should be the 100th NFT creation
+		System::assert_last_event(MockEvent::RmrkCore(crate::Event::NftMinted {
+			owner: ALICE,
+			collection_id: 0,
+			nft_id: 99
+		}));
+	});
+}
+
 /// Collection: Locking collection tests (RMRK2.0 spec: LOCK)
 #[test]
 fn lock_collection_works() {
@@ -145,6 +173,11 @@ fn change_issuer_works() {
 	ExtBuilder::default().build().execute_with(|| {
 		// Create a basic collection
 		assert_ok!(basic_collection());
+		// BOB can't change issuer because he is not the current issuer
+		assert_noop!(
+			RMRKCore::change_issuer(Origin::signed(BOB), 0, BOB),
+			Error::<Test>::NoPermission
+		);
 		// Change issuer from ALICE to BOB
 		assert_ok!(RMRKCore::change_issuer(Origin::signed(ALICE), 0, BOB));
 		// Changing issuer should trigger IssuerChanged event
@@ -530,6 +563,40 @@ fn burn_nft_works() {
 		assert_ok!(basic_collection());
 		// Mint an NFT
 		assert_ok!(basic_mint());
+		// Add two resources to NFT (to test if burning also burns the resources)
+
+		assert_ok!(RMRKCore::add_resource(
+			Origin::signed(ALICE),
+			0,
+			0,
+			stbr("res-1"),
+			Some(0),
+			Some(bvec![0u8; 20]),
+			Some(bvec![0u8; 20]),
+			None,
+			None,
+			None,
+			None
+		));
+
+		assert_ok!(RMRKCore::add_resource(
+			Origin::signed(ALICE),
+			0,
+			0,
+			stbr("res-2"),
+			Some(0),
+			Some(bvec![0u8; 20]),
+			Some(bvec![0u8; 20]),
+			None,
+			None,
+			None,
+			None
+		));		
+
+
+		// Ensure resources are there
+		assert_eq!(Resources::<Test>::iter_prefix((COLLECTION_ID_0, NFT_ID_0)).count(), 2);
+
 		// BOB should not be able to burn ALICE's NFT
 		assert_noop!(
 			RMRKCore::burn_nft(Origin::signed(BOB), COLLECTION_ID_0, NFT_ID_0),
@@ -551,6 +618,8 @@ fn burn_nft_works() {
 		);
 		// Burned NFT no longer exists
 		assert_eq!(RMRKCore::nfts(COLLECTION_ID_0, NFT_ID_0).is_none(), true);
+		// Resources associated with the NFT should no longer exist
+		assert_eq!(Resources::<Test>::iter_prefix((COLLECTION_ID_0, NFT_ID_0)).count(), 0);
 	});
 }
 
@@ -564,6 +633,38 @@ fn burn_nft_with_great_grandchildren_works() {
 		for _ in 0..4 {
 			assert_ok!(basic_mint());
 		}
+		// Add two resources to the great-grandchild (0, 3)
+		assert_ok!(RMRKCore::add_resource(
+			Origin::signed(ALICE),
+			COLLECTION_ID_0,
+			3,
+			stbr("res-1"),
+			Some(0),
+			Some(bvec![0u8; 20]),
+			Some(bvec![0u8; 20]),
+			None,
+			None,
+			None,
+			None
+		));
+
+		assert_ok!(RMRKCore::add_resource(
+			Origin::signed(ALICE),
+			COLLECTION_ID_0,
+			3,
+			stbr("res-2"),
+			Some(0),
+			Some(bvec![0u8; 20]),
+			Some(bvec![0u8; 20]),
+			None,
+			None,
+			None,
+			None
+		));			
+		
+		// Ensure resources are there
+		assert_eq!(Resources::<Test>::iter_prefix((COLLECTION_ID_0, 3)).count(), 2);
+
 		// ALICE sends NFT (0, 1) to NFT (0, 0)
 		assert_ok!(RMRKCore::send(
 			Origin::signed(ALICE),
@@ -590,7 +691,9 @@ fn burn_nft_with_great_grandchildren_works() {
 		// Burn great-grandparent NFT (0, 0)
 		assert_ok!(RMRKCore::burn_nft(Origin::signed(ALICE), COLLECTION_ID_0, NFT_ID_0));
 		// Great-grandchild NFT (0, 3) is dead :'-(
-		assert!(RMRKCore::nfts(COLLECTION_ID_0, 3).is_none())
+		assert!(RMRKCore::nfts(COLLECTION_ID_0, 3).is_none());
+		// Great-grandchild resources are gone
+		assert_eq!(Resources::<Test>::iter_prefix((COLLECTION_ID_0, 3)).count(), 0);
 	});
 }
 
