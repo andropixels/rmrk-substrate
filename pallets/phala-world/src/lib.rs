@@ -62,14 +62,15 @@ pub mod pallet {
 
 	type BalanceOf<T> =
 		<<T as Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance;
-	type PreorderInfoOf<T> = PreorderInfo<<T as frame_system::Config>::AccountId>;
+	type PreorderInfoOf<T> = PreorderInfo<
+		<T as frame_system::Config>::AccountId,
+		BoundedVec<u8, <T as pallet_uniques::Config>::StringLimit>,
+	>;
 	//type OverlordInfoOf<T> = OverlordInfo<<T as frame_system::Config>::AccountId>;
 
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
-	pub trait Config:
-		frame_system::Config + pallet_rmrk_core::Config + pallet_rmrk_market::Config
-	{
+	pub trait Config: frame_system::Config + pallet_rmrk_core::Config {
 		/// Because this pallet emits events, it depends on the runtime's definition of an event.
 		type Event: From<Event<Self>> + IsType<<Self as frame_system::Config>::Event>;
 		/// The origin which may forcibly buy, sell, list/unlist, offer & withdraw offer on Tokens
@@ -159,12 +160,12 @@ pub mod pallet {
 	/// Race Type count
 	#[pallet::storage]
 	#[pallet::getter(fn race_type_count)]
-	pub type RaceTypeCount<T: Config> = StorageMap<_, Twox64Concat, RaceType, u32, ValueQuery>;
+	pub type RaceTypeLeft<T: Config> = StorageMap<_, Twox64Concat, RaceType, u32, ValueQuery>;
 
 	/// Race StorageMap count
 	#[pallet::storage]
 	#[pallet::getter(fn career_type_count)]
-	pub type CareerTypeCount<T: Config> = StorageMap<_, Twox64Concat, CareerType, u32, ValueQuery>;
+	pub type CareerTypeLeft<T: Config> = StorageMap<_, Twox64Concat, CareerType, u32, ValueQuery>;
 
 	/// Overlord Admin account of Phala World
 	#[pallet::storage]
@@ -234,6 +235,16 @@ pub mod pallet {
 			<CanPurchaseRareEggs<T>>::put(can_purchase_rare_eggs);
 			let can_preorder_eggs = self.can_preorder_eggs;
 			<CanPreorderEggs<T>>::put(can_preorder_eggs);
+			// Set max mints per race and career
+			RaceTypeLeft::<T>::insert(RaceType::Cyborg, T::MaxMintPerRace::get());
+			RaceTypeLeft::<T>::insert(RaceType::Pandroid, T::MaxMintPerRace::get());
+			RaceTypeLeft::<T>::insert(RaceType::AISpectre, T::MaxMintPerRace::get());
+			RaceTypeLeft::<T>::insert(RaceType::XGene, T::MaxMintPerRace::get());
+			CareerTypeLeft::<T>::insert(CareerType::HardwareDruid, T::MaxMintPerCareer::get());
+			CareerTypeLeft::<T>::insert(CareerType::HackerWizard, T::MaxMintPerCareer::get());
+			CareerTypeLeft::<T>::insert(CareerType::RoboWarrior, T::MaxMintPerCareer::get());
+			CareerTypeLeft::<T>::insert(CareerType::TradeNegotiator, T::MaxMintPerCareer::get());
+			CareerTypeLeft::<T>::insert(CareerType::Web3Monk, T::MaxMintPerCareer::get());
 		}
 	}
 
@@ -266,8 +277,8 @@ pub mod pallet {
 			owner: T::AccountId,
 			preorder_id: PreorderId,
 		},
-		/// Egg claimed from the winning preorder
-		EggClaimed {
+		/// Egg minted from the preorder
+		EggMinted {
 			collection_id: CollectionId,
 			nft_id: NftId,
 			owner: T::AccountId,
@@ -337,22 +348,18 @@ pub mod pallet {
 	#[pallet::error]
 	pub enum Error<T> {
 		WorldClockAlreadySet,
-		AccountNotInWhitelist,
-		NoClaimAvailable,
+		SpiritClaimNotAvailable,
 		RareEggPurchaseNotAvailable,
 		PreorderEggNotAvailable,
 		SpiritAlreadyClaimed,
 		ClaimVerificationFailed,
-		ClaimIsOver,
-		InsufficientFunds,
 		InvalidPurchase,
 		NoAvailablePreorderId,
-		InvalidClaimTicket,
+		RaceMintMaxReached,
+		CareerMintMaxReached,
 		CannotHatchEgg,
 		CannotSendFoodToEgg,
 		NoFoodAvailable,
-		NoPermission,
-		CareerAndRaceAlreadyChosen,
 		OverlordNotSet,
 		RequireOverlordAccount,
 		InvalidStatusType,
@@ -385,7 +392,7 @@ pub mod pallet {
 			signature: sr25519::Signature,
 			metadata: BoundedVec<u8, T::StringLimit>,
 		) -> DispatchResult {
-			ensure!(CanClaimSpirits::<T>::get(), Error::<T>::ClaimIsOver);
+			ensure!(CanClaimSpirits::<T>::get(), Error::<T>::SpiritClaimNotAvailable);
 			let sender = ensure_signed(origin)?;
 			let overlord = Overlord::<T>::get().ok_or(Error::<T>::OverlordNotSet)?;
 			// Has the SerialId already been claimed
@@ -441,6 +448,19 @@ pub mod pallet {
 				_ => return Err(Error::<T>::InvalidPurchase.into()),
 			};
 			let nft_id = pallet_rmrk_core::NextNftId::<T>::get(EGGS_COLLECTION_ID);
+			// Check if race and career types have mints left
+			Self::has_race_type_left(&race)?;
+			Self::has_career_type_left(&career)?;
+
+			// Define EggInfo for storage
+			let egg = EggInfo {
+				egg_type,
+				race: race.clone(),
+				career: career.clone(),
+				start_hatching: 0,
+				hatching_duration: 0,
+			};
+
 			// Transfer the amount for the rare Egg NFT then mint the egg
 			<T as pallet::Config>::Currency::transfer(
 				&sender,
@@ -457,17 +477,10 @@ pub mod pallet {
 				None,
 				metadata,
 			)?;
-			// Add EggInfo to storage
-			let egg = EggInfo {
-				egg_type,
-				race: race.clone(),
-				career: career.clone(),
-				start_hatching: 0,
-				hatching_duration: 0,
-			};
+
+			Self::decrement_race_type(race);
+			Self::decrement_career_type(career);
 			Eggs::<T>::insert(EGGS_COLLECTION_ID, nft_id, egg);
-			Self::increment_race_type(race);
-			Self::increment_career_type(career);
 
 			Self::deposit_event(Event::RareEggPurchased {
 				collection_id: EGGS_COLLECTION_ID,
@@ -493,9 +506,14 @@ pub mod pallet {
 			origin: OriginFor<T>,
 			race: RaceType,
 			career: CareerType,
+			metadata: BoundedVec<u8, T::StringLimit>,
 		) -> DispatchResult {
 			ensure!(CanPreorderEggs::<T>::get(), Error::<T>::PreorderEggNotAvailable);
 			let sender = ensure_signed(origin)?;
+			// Check if the race and career have reached their limit
+			Self::has_race_type_left(&race)?;
+			Self::has_career_type_left(&career)?;
+			// Get preorder_id for new preorder
 			let preorder_id =
 				<PreorderIndex<T>>::try_mutate(|n| -> Result<PreorderId, DispatchError> {
 					let id = *n;
@@ -504,10 +522,17 @@ pub mod pallet {
 					Ok(id)
 				})?;
 
+			let preorder = PreorderInfo {
+				owner: sender.clone(),
+				race: race.clone(),
+				career: career.clone(),
+				metadata,
+			};
 			// Reserve currency for the preorder at the Normal egg price
 			<T as pallet::Config>::Currency::reserve(&sender, T::NormalEggPrice::get())?;
 
-			let preorder = PreorderInfo { owner: sender.clone(), race, career };
+			Self::decrement_race_type(race);
+			Self::decrement_career_type(career);
 			Preorders::<T>::insert(preorder_id, preorder);
 
 			Self::deposit_event(Event::EggPreordered { owner: sender, preorder_id });
@@ -523,33 +548,49 @@ pub mod pallet {
 		pub fn mint_eggs(origin: OriginFor<T>) -> DispatchResult {
 			// Ensure Overlord account makes call
 			let sender = ensure_signed(origin)?;
-			Self::ensure_overlord(sender)?;
-			// Get the current PreorderId
-			let current_preorder_id = PreorderIndex::<T>::get();
-			for preorder_id in 0..current_preorder_id {
+			Self::ensure_overlord(sender.clone())?;
+			// Iterate through Preorders
+			for preorder_id in Preorders::<T>::iter_keys() {
 				if let Some(preorder) = Preorders::<T>::take(preorder_id) {
-					let egg_owner = preorder.owner.clone();
-					let egg_type = EggType::Normal;
-					let egg_race = preorder.race;
-					let egg_career = preorder.career;
+					let egg_price = T::NormalEggPrice::get();
+					// Define EggInfo for storage
+					let egg = EggInfo {
+						egg_type: EggType::Normal,
+						race: preorder.race.clone(),
+						career: preorder.career.clone(),
+						start_hatching: 0,
+						hatching_duration: 0,
+					};
+					// Next NFT ID of Collection
+					let nft_id = pallet_rmrk_core::NextNftId::<T>::get(EGGS_COLLECTION_ID);
 
 					// Get payment from owner's reserve
+					<T as pallet::Config>::Currency::unreserve(&preorder.owner, egg_price);
+					<T as pallet::Config>::Currency::transfer(
+						&preorder.owner,
+						&sender,
+						egg_price,
+						ExistenceRequirement::KeepAlive,
+					)?;
+					// Mint Egg and transfer Egg to new owner
+					pallet_rmrk_core::Pallet::<T>::mint_nft(
+						Origin::<T>::Signed(sender.clone()).into(),
+						preorder.owner.clone(),
+						EGGS_COLLECTION_ID,
+						None,
+						None,
+						preorder.metadata,
+					)?;
+
+					Eggs::<T>::insert(EGGS_COLLECTION_ID, nft_id, egg);
+
+					Self::deposit_event(Event::EggMinted {
+						collection_id: EGGS_COLLECTION_ID,
+						nft_id,
+						owner: preorder.owner,
+					});
 				}
 			}
-
-			Ok(())
-		}
-
-		/// For users that did not win an egg, they can claim their refund here and will be
-		/// given the amount the paid to preorder an egg deposited to their account
-		///
-		/// Parameters:
-		/// - origin: The origin of the extrinsic claiming the refund
-		/// - claim_id: The serial id of the claim that is being claimed
-		#[pallet::weight(10_000 + T::DbWeight::get().reads_writes(1,1))]
-		#[transactional]
-		pub fn claim_refund(origin: OriginFor<T>, claim_id: SerialId) -> DispatchResult {
-			let sender = ensure_signed(origin)?;
 
 			Ok(())
 		}
@@ -783,12 +824,38 @@ impl<T: Config> Pallet<T> {
 		Ok(())
 	}
 
+	/// Decrement RaceType count for the `race`
+	///
+	/// Parameters:
+	/// - `race`: The Race to increment count
+	fn decrement_race_type(race: RaceType) -> DispatchResult {
+		RaceTypeLeft::<T>::mutate(race, |race_count| {
+			*race_count = race_count.saturating_sub(One::one());
+			*race_count
+		});
+
+		Ok(())
+	}
+
+	/// Decrement CareerType count for the `career`
+	///
+	/// Parameters:
+	/// - `career`: The Career to increment count
+	fn decrement_career_type(career: CareerType) -> DispatchResult {
+		CareerTypeLeft::<T>::mutate(career, |career_count| {
+			*career_count = career_count.saturating_sub(One::one());
+			*career_count
+		});
+
+		Ok(())
+	}
+
 	/// Increment RaceType count for the `race`
 	///
 	/// Parameters:
 	/// - `race`: The Race to increment count
 	fn increment_race_type(race: RaceType) -> DispatchResult {
-		RaceTypeCount::<T>::mutate(race, |race_count| {
+		RaceTypeLeft::<T>::mutate(race, |race_count| {
 			*race_count = race_count.saturating_add(One::one());
 			*race_count
 		});
@@ -801,7 +868,7 @@ impl<T: Config> Pallet<T> {
 	/// Parameters:
 	/// - `career`: The Career to increment count
 	fn increment_career_type(career: CareerType) -> DispatchResult {
-		CareerTypeCount::<T>::mutate(career, |career_count| {
+		CareerTypeLeft::<T>::mutate(career, |career_count| {
 			*career_count = career_count.saturating_add(One::one());
 			*career_count
 		});
@@ -809,9 +876,21 @@ impl<T: Config> Pallet<T> {
 		Ok(())
 	}
 
-	// Verify if the preorder has chosen a Race and Career that have not reached the max limit
-	//
-	// Parameters:
-	// - `race`: The Race chosen by the preorder
-	// - `career`: The Career chosen by the preorder
+	/// Verify if the chosen Race has reached the max limit
+	///
+	/// Parameters:
+	/// - `race`: The Race to check
+	fn has_race_type_left(race: &RaceType) -> DispatchResult {
+		ensure!(RaceTypeLeft::<T>::get(race) > 0, Error::<T>::RaceMintMaxReached);
+		Ok(())
+	}
+
+	/// Verify if the chosen a Career has reached the max limit
+	///
+	/// Parameters:
+	/// - `career`: The Career to check
+	fn has_career_type_left(career: &CareerType) -> DispatchResult {
+		ensure!(CareerTypeLeft::<T>::get(career) > 0, Error::<T>::CareerMintMaxReached);
+		Ok(())
+	}
 }

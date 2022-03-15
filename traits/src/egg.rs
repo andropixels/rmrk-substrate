@@ -2,13 +2,14 @@ use codec::{Decode, Encode};
 use scale_info::TypeInfo;
 use sp_runtime::{DispatchError, RuntimeDebug};
 use sp_std::cmp::Eq;
+use frame_support::pallet_prelude::*;
 
 use crate::{career::CareerType, primitives::*, race::RaceType};
 use serde::{Deserialize, Serialize};
 use sp_std::result::Result;
 
 // Egg Types of Normal, Legendary & Founder
-#[derive(Encode, Decode, Clone, Eq, PartialEq, RuntimeDebug, TypeInfo)]
+#[derive(Encode, Decode, Clone, Eq, PartialEq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub enum EggType {
 	Normal,
@@ -16,7 +17,7 @@ pub enum EggType {
 	Founder,
 }
 
-#[derive(Encode, Decode, Eq, PartialEq, Clone, RuntimeDebug, TypeInfo)]
+#[derive(Encode, Decode, Eq, PartialEq, Clone, RuntimeDebug, TypeInfo, MaxEncodedLen)]
 #[cfg_attr(feature = "std", derive(Serialize, Deserialize))]
 pub struct EggInfo {
 	/// Egg type of the Egg RMRK NFT

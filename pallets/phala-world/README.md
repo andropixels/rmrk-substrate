@@ -80,7 +80,6 @@ pub enum Error<T> {
 		AccountNotInWhitelist,
 		NoClaimAvailable,
 		SpiritAlreadyClaimed,
-		ClaimIsOver,
 		InsufficientFunds,
 		InvalidClaimTicket,
 		CannotHatchEgg,
