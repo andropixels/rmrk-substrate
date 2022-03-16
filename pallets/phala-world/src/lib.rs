@@ -95,6 +95,15 @@ pub mod pallet {
 		/// Max mint per Career
 		#[pallet::constant]
 		type MaxMintPerCareer: Get<u32>;
+		/// Amount of food per Era
+		#[pallet::constant]
+		type FoodPerEra: Get<u8>;
+		/// Max food an Egg can be fed per day
+		#[pallet::constant]
+		type MaxFoodFedPerEra: Get<u16>;
+		/// Max food to feed your own Egg
+		#[pallet::constant]
+		type MaxFoodFeedSelf: Get<u8>;
 	}
 
 	#[pallet::pallet]

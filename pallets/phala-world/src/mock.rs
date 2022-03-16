@@ -149,6 +149,9 @@ parameter_types! {
 	pub const NormalEggPrice: Balance = 10 * PHA;
 	pub const MaxMintPerRace: u32 = 2;
 	pub const MaxMintPerCareer: u32 = 2;
+	pub const FoodPerEra: u8 = 2;
+	pub const MaxFoodFedPerEra: u16 = 2;
+	pub const MaxFoodFeedSelf: u8 = 1;
 }
 
 impl Config for Test {
@@ -161,6 +164,9 @@ impl Config for Test {
 	type NormalEggPrice = NormalEggPrice;
 	type MaxMintPerRace = MaxMintPerRace;
 	type MaxMintPerCareer = MaxMintPerCareer;
+	type FoodPerEra = FoodPerEra;
+	type MaxFoodFedPerEra = MaxFoodFedPerEra;
+	type MaxFoodFeedSelf = MaxFoodFeedSelf;
 }
 
 pub type SystemCall = frame_system::Call<Test>;
