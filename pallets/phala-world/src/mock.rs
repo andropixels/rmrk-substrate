@@ -6,11 +6,9 @@ use frame_support::{
 	traits::{ConstU32, ConstU64, Everything, GenesisBuild, OnFinalize, OnInitialize},
 	weights::Weight,
 };
-use frame_system as system;
 use frame_system::EnsureRoot;
 use sp_core::{crypto::AccountId32, sr25519::Signature, Pair, Public, H256};
 
-use rmrk_traits::AccountIdOrCollectionNftTuple;
 use sp_runtime::{
 	testing::Header,
 	traits::{BlakeTwo256, IdentityLookup},
@@ -144,8 +142,8 @@ impl pallet_rmrk_market::Config for Test {
 
 parameter_types! {
 	pub const BlocksPerEra: BlockNumber = 5;
-	pub const FounderEggPrice: Balance = 1_000 * PHA;
-	pub const LegendaryEggPrice: Balance = 100 * PHA;
+	pub const FounderEggPrice: Balance = 1_000_000 * PHA;
+	pub const LegendaryEggPrice: Balance = 1_000 * PHA;
 	pub const NormalEggPrice: Balance = 10 * PHA;
 	pub const MaxMintPerRace: u32 = 2;
 	pub const MaxMintPerCareer: u32 = 2;
@@ -179,16 +177,27 @@ pub fn fast_forward_to(n: u64) {
 		PhalaWorld::on_finalize(System::block_number());
 	}
 }
-
+// overlord_pair = sr25519::Pair::from_seed(b"28133080042813308004281330800428");
+pub const OVERLORD: AccountId = AccountId::new([
+	176, 155, 174, 174, 163, 79, 183, 121, 13, 202, 60, 83, 242, 187, 181, 64, 51, 220, 13, 104,
+	162, 108, 19, 241, 150, 65, 49, 48, 136, 28, 19, 101,
+]);
+// alice_pair = sr25519::Pair::from_seed(b"12345678901234567890123456789012");
 pub const ALICE: AccountId = AccountId::new([
 	116, 28, 8, 160, 111, 65, 197, 150, 96, 143, 103, 116, 37, 155, 217, 4, 51, 4, 173, 250, 93,
 	62, 234, 98, 118, 11, 217, 190, 151, 99, 77, 99,
 ]);
+// bob_pair = sr25519::Pair::from_seed(b"09876543210987654321098765432109");
 pub const BOB: AccountId = AccountId::new([
 	250, 140, 153, 155, 88, 13, 83, 23, 193, 161, 236, 241, 58, 213, 107, 213, 230, 33, 38, 154,
 	78, 125, 67, 186, 54, 157, 62, 131, 179, 150, 232, 82,
 ]);
-pub const CHARLIE: AccountId = AccountId::new([3u8; 32]);
+// charlie_pair = sr25519::Pair::from_seed(b"19004878537190048785371900487853");
+pub const CHARLIE: AccountId = AccountId::new([
+	144, 178, 175, 207, 158, 226, 236, 9, 193, 197, 35, 61, 203, 142, 237, 60, 100, 189, 217, 163,
+	184, 20, 116, 158, 252, 151, 72, 114, 185, 129, 78, 43,
+]);
+
 pub const PHA: Balance = 1;
 pub const UNITS: Balance = 100_000_000_000;
 
@@ -223,6 +232,7 @@ impl ExtBuilder {
 
 		pallet_balances::GenesisConfig::<Test> {
 			balances: vec![
+				(OVERLORD, 2_813_308_004 * PHA),
 				(ALICE, 20_000_000 * PHA),
 				(BOB, 15_000 * PHA),
 				(CHARLIE, 150_000 * PHA),
