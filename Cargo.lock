@@ -3810,6 +3810,7 @@ dependencies = [
  "pallet-balances",
  "pallet-rmrk-core",
  "pallet-rmrk-market",
+ "pallet-timestamp",
  "pallet-uniques",
  "parity-scale-codec",
  "rmrk-traits",

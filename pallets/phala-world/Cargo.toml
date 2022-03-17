@@ -28,6 +28,7 @@ frame-benchmarking = { default-features = false, version = "4.0.0-dev", git = "h
 
 pallet-uniques = { default-features = false, version = "4.0.0-dev", git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.17" }
 pallet-balances = { default-features = false, version = "4.0.0-dev", git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.17" }
+pallet-timestamp = { default-features = false, version = "4.0.0-dev", git = "https://github.com/paritytech/substrate.git", branch = "polkadot-v0.9.17" }
 
 # Local Dependencies
 pallet-rmrk-core = { default-features = false, version = "0.0.1", path = "../rmrk-core" }
@@ -43,6 +44,7 @@ default = ["std"]
 std = [
 	"pallet-uniques/std",
 	"pallet-balances/std",
+	"pallet-timestamp/std",
 	"serde/std",
 	"codec/std",
 	"scale-info/std",

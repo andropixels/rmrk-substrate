@@ -19,7 +19,10 @@ type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
 type Block = frame_system::mocking::MockBlock<Test>;
 type Balance = u128;
 type BlockNumber = u64;
-
+pub const INIT_TIMESTAMP: u64 = 30_000;
+pub const BLOCK_TIME: u64 = 1_000;
+pub const INIT_TIMESTAMP_SECONDS: u64 = 30;
+pub const BLOCK_TIME_SECONDS: u64 = 1;
 // Configure a mock runtime to test the pallet.
 frame_support::construct_runtime!(
 	pub enum Test where
@@ -28,6 +31,7 @@ frame_support::construct_runtime!(
 		UncheckedExtrinsic = UncheckedExtrinsic,
 	{
 		System: frame_system::{Pallet, Call, Config, Storage, Event<T>},
+		Timestamp: pallet_timestamp::{Pallet, Call, Storage, Inherent},
 		Uniques: pallet_uniques::{Pallet, Storage, Event<T>},
 		RmrkCore: pallet_rmrk_core::{Pallet, Call, Event<T>},
 		Balances: pallet_balances::{Pallet, Call, Storage, Event<T>},
@@ -141,7 +145,18 @@ impl pallet_rmrk_market::Config for Test {
 }
 
 parameter_types! {
-	pub const BlocksPerEra: BlockNumber = 5;
+	pub const MinimumPeriod: u64 = 5;
+}
+
+impl pallet_timestamp::Config for Test {
+	type Moment = u64;
+	type OnTimestampSet = ();
+	type MinimumPeriod = MinimumPeriod;
+	type WeightInfo = ();
+}
+
+parameter_types! {
+	pub const SecondsPerEra: u64 = 5 * BLOCK_TIME_SECONDS;
 	pub const FounderEggPrice: Balance = 1_000_000 * PHA;
 	pub const LegendaryEggPrice: Balance = 1_000 * PHA;
 	pub const NormalEggPrice: Balance = 10 * PHA;
@@ -156,7 +171,8 @@ impl Config for Test {
 	type Event = Event;
 	type OverlordOrigin = EnsureRoot<AccountId>;
 	type Currency = Balances;
-	type BlocksPerEra = BlocksPerEra;
+	type SecondsPerEra = SecondsPerEra;
+	type Time = pallet_timestamp::Pallet<Test>;
 	type FounderEggPrice = FounderEggPrice;
 	type LegendaryEggPrice = LegendaryEggPrice;
 	type NormalEggPrice = NormalEggPrice;
@@ -175,6 +191,7 @@ pub fn fast_forward_to(n: u64) {
 		System::set_block_number(System::block_number() + 1);
 		System::on_finalize(System::block_number());
 		PhalaWorld::on_finalize(System::block_number());
+		Timestamp::set_timestamp(System::block_number() * BLOCK_TIME + INIT_TIMESTAMP);
 	}
 }
 // overlord_pair = sr25519::Pair::from_seed(b"28133080042813308004281330800428");
@@ -242,7 +259,10 @@ impl ExtBuilder {
 		.unwrap();
 
 		let mut ext = sp_io::TestExternalities::new(t);
-		ext.execute_with(|| System::set_block_number(1));
+		ext.execute_with(|| {
+			System::set_block_number(1);
+			Timestamp::set_timestamp(INIT_TIMESTAMP);
+		});
 		ext
 	}
 }

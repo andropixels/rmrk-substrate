@@ -144,13 +144,16 @@ fn auto_increment_era_works() {
 		// Initialize the Phala World Clock
 		assert_ok!(PhalaWorld::initialize_world_clock(Origin::signed(BOB)));
 		// Check Zero Day is Some(1)
-		assert_eq!(PhalaWorld::zero_day(), Some(1));
+		assert_eq!(PhalaWorld::zero_day(), Some(INIT_TIMESTAMP_SECONDS));
 		// Go to block 7 that would increment the Era at Block 6
 		fast_forward_to(7);
 		// Check Era is 1
 		assert_eq!(PhalaWorld::era(), 1);
 		// Check if event triggered
-		System::assert_last_event(MockEvent::PhalaWorld(crate::Event::NewEra { time: 6, era: 1 }));
+		System::assert_last_event(MockEvent::PhalaWorld(crate::Event::NewEra {
+			time: 5 * BLOCK_TIME_SECONDS + INIT_TIMESTAMP_SECONDS,
+			era: 1,
+		}));
 	});
 }
 

@@ -1,6 +1,10 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
-use frame_support::{ensure, traits::Currency, transactional, BoundedVec};
+use frame_support::{
+	ensure,
+	traits::{Currency, UnixTime},
+	transactional, BoundedVec,
+};
 use frame_system::ensure_signed;
 
 use codec::{Decode, Encode};
@@ -77,9 +81,11 @@ pub mod pallet {
 		type OverlordOrigin: EnsureOrigin<Self::Origin>;
 		/// The market currency mechanism.
 		type Currency: ReservableCurrency<Self::AccountId>;
-		/// Block per Era that will increment the Era storage value every interval
+		/// Time in UnixTime
+		type Time: UnixTime;
+		/// Seconds per Era that will increment the Era storage value every interval
 		#[pallet::constant]
-		type BlocksPerEra: Get<Self::BlockNumber>;
+		type SecondsPerEra: Get<u64>;
 		/// Price of Founder Egg Price
 		#[pallet::constant]
 		type FounderEggPrice: Get<BalanceOf<Self>>;
@@ -144,7 +150,7 @@ pub mod pallet {
 	/// Phala World Zero Day `BlockNumber` this will be used to determine Eras
 	#[pallet::storage]
 	#[pallet::getter(fn zero_day)]
-	pub(super) type ZeroDay<T: Config> = StorageValue<_, T::BlockNumber, OptionQuery>;
+	pub(super) type ZeroDay<T: Config> = StorageValue<_, u64>;
 
 	/// The current Era from the initial ZeroDay BlockNumber
 	#[pallet::storage]
@@ -185,13 +191,17 @@ pub mod pallet {
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
 		fn on_finalize(n: T::BlockNumber) {
 			if let Some(zero_day) = <ZeroDay<T>>::get() {
-				let blocks_since_zero_day = n - zero_day;
-				if (blocks_since_zero_day % T::BlocksPerEra::get()).is_zero() {
-					let current_era = Era::<T>::mutate(|era| {
-						*era = era.saturating_add(One::one());
-						*era
-					});
-					Self::deposit_event(Event::NewEra { time: n, era: current_era });
+				let current_time = T::Time::now().as_secs();
+				if current_time > zero_day {
+					let secs_since_zero_day = current_time - zero_day;
+					let current_era = <Era<T>>::get();
+					if secs_since_zero_day / T::SecondsPerEra::get() > current_era {
+						let new_era = Era::<T>::mutate(|era| {
+							*era = era.saturating_add(One::one());
+							*era
+						});
+						Self::deposit_event(Event::NewEra { time: current_time, era: new_era });
+					}
 				}
 			}
 		}
@@ -200,7 +210,7 @@ pub mod pallet {
 	#[pallet::genesis_config]
 	pub struct GenesisConfig<T: Config> {
 		/// `BlockNumber` of Phala World Zero Day
-		pub zero_day: Option<T::BlockNumber>,
+		pub zero_day: Option<u64>,
 		/// Overlord Admin account of Phala World
 		pub overlord: Option<T::AccountId>,
 		/// Current Era of Phala World
@@ -263,11 +273,11 @@ pub mod pallet {
 	pub enum Event<T: Config> {
 		/// Phala World clock zero day started
 		WorldClockStarted {
-			start_time: T::BlockNumber,
+			start_time: u64,
 		},
 		/// Start of a new era
 		NewEra {
-			time: T::BlockNumber,
+			time: u64,
 			era: u64,
 		},
 		/// Spirit has been claimed from the whitelist
@@ -720,9 +730,9 @@ pub mod pallet {
 			// Ensure ZeroDay is None as this can only be set once
 			ensure!(Self::zero_day() == None, Error::<T>::WorldClockAlreadySet);
 
-			let zero_day = <frame_system::Pallet<T>>::block_number();
+			let zero_day = T::Time::now().as_secs();
 
-			ZeroDay::<T>::put(&zero_day);
+			ZeroDay::<T>::put(zero_day);
 			Self::deposit_event(Event::WorldClockStarted { start_time: zero_day });
 
 			Ok(Pays::No.into())

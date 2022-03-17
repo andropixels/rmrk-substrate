@@ -12,7 +12,7 @@ use sp_runtime::{
 	create_runtime_str, generic, impl_opaque_keys,
 	traits::{AccountIdLookup, BlakeTwo256, Block as BlockT, IdentifyAccount, NumberFor, Verify},
 	transaction_validity::{TransactionSource, TransactionValidity},
-	ApplyExtrinsicResult, MultiSignature,
+	ApplyExtrinsicResult, MultiSignature, RuntimeString,
 };
 use sp_std::prelude::*;
 #[cfg(feature = "std")]
@@ -144,6 +144,7 @@ pub const SLOT_DURATION: u64 = MILLISECS_PER_BLOCK;
 pub const MINUTES: BlockNumber = 60_000 / (MILLISECS_PER_BLOCK as BlockNumber);
 pub const HOURS: BlockNumber = MINUTES * 60;
 pub const DAYS: BlockNumber = HOURS * 24;
+pub const SECONDS_PER_DAY: u64 = 86400;
 
 /// The version information used to identify this runtime when compiled natively.
 #[cfg(feature = "std")]
@@ -317,7 +318,7 @@ impl pallet_rmrk_core::Config for Runtime {
 }
 
 parameter_types! {
-	pub const BlocksPerEra: BlockNumber = DAYS;
+	pub const SecondsPerEra: u64 = SECONDS_PER_DAY;
 	pub const FounderEggPrice: Balance = 10_000 * DOLLARS;
 	pub const LegendaryEggPrice: Balance = 1_000 * DOLLARS;
 	pub const NormalEggPrice: Balance = 100 * DOLLARS;
@@ -331,7 +332,8 @@ impl pallet_phala_world::Config for Runtime {
 	type Event = Event;
 	type OverlordOrigin = frame_system::EnsureRoot<AccountId>;
 	type Currency = Balances;
-	type BlocksPerEra = BlocksPerEra;
+	type Time = pallet_timestamp::Pallet<Runtime>;
+	type SecondsPerEra = SecondsPerEra;
 	type FounderEggPrice = FounderEggPrice;
 	type LegendaryEggPrice = LegendaryEggPrice;
 	type NormalEggPrice = NormalEggPrice;
