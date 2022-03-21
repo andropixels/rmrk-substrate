@@ -128,7 +128,7 @@ where
 	}
 }
 
-impl<T: Config> Collection<StringLimitOf<T>, T::AccountId> for Pallet<T>
+impl<T: Config> Collection<StringLimitOf<T>, BoundedCollectionSymbolOf<T>, T::AccountId> for Pallet<T>
 where
 	T: pallet_uniques::Config<ClassId = CollectionId, InstanceId = NftId>,
 {
@@ -139,7 +139,7 @@ where
 		issuer: T::AccountId,
 		metadata: StringLimitOf<T>,
 		max: Option<u32>,
-		symbol: StringLimitOf<T>,
+		symbol: BoundedCollectionSymbolOf<T>,
 	) -> Result<CollectionId, DispatchError> {
 		let collection = CollectionInfo { issuer, metadata, max, symbol, nfts_count: 0 };
 		let collection_id =
