@@ -718,7 +718,7 @@ pub mod pallet {
 		}
 
 		/// Phala World Zero Day is set to begin the tracking of the official time starting at the
-		/// current block when `initialize_world_clock` is called by the `Overlord`
+		/// current timestamp when `initialize_world_clock` is called by the `Overlord`
 		///
 		/// Parameters:
 		/// `origin`: Expected to be called by `Overlord` admin account

@@ -2,46 +2,69 @@
 
 ## Types
 ```rust
-pub struct WorldClockInfo {
-    /// Block number at which world clock started
-    zero_day: T::BlockNumber,
-    /// Number of eras that have passed
-    eras: u128,
-}
-
 pub enum EggType {
     /// Egg is a normal egg
-    Normal = 0,
+    Normal,
     /// Egg is a legendary egg
-    Legendary = 1,
+    Legendary,
     /// Egg is a founder egg
-    Founder = 2,
+    Founder,
 }
 
 /// Four Races to choose from
 #[derive(Encode, Decode, Clone, PartialEq)]
 pub enum RaceType {
-    Cyborg = 0,
-    PhatrixAmrita = 1,
-    Devil = 2,
-    Robot = 3,
+    Cyborg,
+    AISpectre,
+    XGene,
+    Pandroid,
 }
 
 /// Five Careers to choose from
 #[derive(Encode, Decode, Clone, PartialEq)]
 pub enum CareerType {
-    HardwareDruid = 0,
-    RoboWarrior = 1,
-    NegotiateTrade = 2,
-    HackerWizard = 3,
-    Web3Monk = 4,
+    HardwareDruid,
+    RoboWarrior,
+    TradeNegotiator,
+    HackerWizard,
+    Web3Monk,
 }
+```
 
+### Constants
+```rust
+/// Seconds per Era that will increment the Era storage value every interval
+#[pallet::constant]
+type SecondsPerEra: Get<u64>;
+/// Price of Founder Egg Price
+#[pallet::constant]
+type FounderEggPrice: Get<BalanceOf<Self>>;
+/// Price of Legendary Egg Price
+#[pallet::constant]
+type LegendaryEggPrice: Get<BalanceOf<Self>>;
+/// Price of Normal Egg Price
+#[pallet::constant]
+type NormalEggPrice: Get<BalanceOf<Self>>;
+/// Max mint per Race
+#[pallet::constant]
+type MaxMintPerRace: Get<u32>;
+/// Max mint per Career
+#[pallet::constant]
+type MaxMintPerCareer: Get<u32>;
+/// Amount of food per Era
+#[pallet::constant]
+type FoodPerEra: Get<u8>;
+/// Max food an Egg can be fed per day
+#[pallet::constant]
+type MaxFoodFedPerEra: Get<u16>;
+/// Max food to feed your own Egg
+#[pallet::constant]
+type MaxFoodFeedSelf: Get<u8>;
 ```
 
 ## Storage
 ```rust
-/// Stores all of the valid claimed spirits from the airdrop
+/// Stores all of the valid claimed spirits from the airdrop by serial id & bool true if claimed
 #[pallet::storage]
 #[pallet::getter(fn claimed_spirits)]
 pub type ClaimedSpirits<T: Config> = StorageMap<_, Twox64Concat, SerialId, bool>;
@@ -51,25 +74,66 @@ pub type ClaimedSpirits<T: Config> = StorageMap<_, Twox64Concat, SerialId, bool>
 #[pallet::getter(fn claimed_eggs)]
 pub type ClaimedEggs<T: Config> = StorageMap<_, Twox64Concat, SerialId, bool>;
 
-/// Preorder info
+/// Preorder index that is the key to the Preorders StorageMap
 #[pallet::storage]
-#[pallet::getter(fn preorder_info)]
-pub type PreOrderInfo<T: Config> = StorageMap<_, Twox64Concat, (SerialId, T::AccountId), (Race, Career)>;
+#[pallet::getter(fn preorder_index)]
+pub type PreorderIndex<T: Config> = StorageValue<_, PreorderId, ValueQuery>;
 
-/// Food per Owner
+/// Preorder info map for user preorders
 #[pallet::storage]
-#[pallet::getter(fn food_by_owner)]
+#[pallet::getter(fn preorders)]
+pub type Preorders<T: Config> = StorageMap<_, Twox64Concat, PreorderId, PreorderInfoOf<T>>;
+
+/// Stores all the Eggs and the information about the Egg pertaining to Hatch times and feeding
+#[pallet::storage]
+#[pallet::getter(fn eggs)]
+pub type Eggs<T: Config> =
+StorageDoubleMap<_, Blake2_128Concat, CollectionId, Blake2_128Concat, NftId, EggInfo>;
+
+/// Food per Owner where an owner gets 5 food per era
+#[pallet::storage]
+#[pallet::getter(fn get_food_by_owner)]
 pub type FoodByOwner<T: Config> = StorageMap<_, Twox64Concat, T::AccountId, u8>;
 
-/// Eggs hatch time clock
+/// Phala World Zero Day `BlockNumber` this will be used to determine Eras
 #[pallet::storage]
-#[pallet::getter(fn hatch_timer)]
-pub type HatchTimer<T: Config> = StorageMap<_, Twox64Concat, (CollectionId, NftId), T::BlockNumber>;
+#[pallet::getter(fn zero_day)]
+pub(super) type ZeroDay<T: Config> = StorageValue<_, u64>;
 
-/// Era index for Phala World
+/// The current Era from the initial ZeroDay BlockNumber
 #[pallet::storage]
-#[pallet::getter(fn era_index)]
-pub type EraIndex<T:Config> = StorageValue<_, EraId, ValueQuery>;
+#[pallet::getter(fn era)]
+pub type Era<T: Config> = StorageValue<_, u64, ValueQuery>;
+
+/// Spirits can be claimed
+#[pallet::storage]
+#[pallet::getter(fn can_claim_spirits)]
+pub type CanClaimSpirits<T: Config> = StorageValue<_, bool, ValueQuery>;
+
+/// Rare Eggs can be purchased
+#[pallet::storage]
+#[pallet::getter(fn can_purchase_rare_eggs)]
+pub type CanPurchaseRareEggs<T: Config> = StorageValue<_, bool, ValueQuery>;
+
+/// Eggs can be preordered
+#[pallet::storage]
+#[pallet::getter(fn can_preorder_eggs)]
+pub type CanPreorderEggs<T: Config> = StorageValue<_, bool, ValueQuery>;
+
+/// Race Type count
+#[pallet::storage]
+#[pallet::getter(fn race_type_count)]
+pub type RaceTypeLeft<T: Config> = StorageMap<_, Twox64Concat, RaceType, u32, ValueQuery>;
+
+/// Race StorageMap count
+#[pallet::storage]
+#[pallet::getter(fn career_type_count)]
+pub type CareerTypeLeft<T: Config> = StorageMap<_, Twox64Concat, CareerType, u32, ValueQuery>;
+
+/// Overlord Admin account of Phala World
+#[pallet::storage]
+#[pallet::getter(fn overlord)]
+pub(super) type Overlord<T: Config> = StorageValue<_, T::AccountId, OptionQuery>;
 ```
 
 ## Errors
@@ -77,118 +141,110 @@ pub type EraIndex<T:Config> = StorageValue<_, EraId, ValueQuery>;
 /// Errors displayed to inform users something went wrong
 #[pallet::error]
 pub enum Error<T> {
-		AccountNotInWhitelist,
-		NoClaimAvailable,
-		SpiritAlreadyClaimed,
-		InsufficientFunds,
-		InvalidClaimTicket,
-		CannotHatchEgg,
-		CannotSendFoodToEgg,
-		NoFoodAvailable,
-		NoPermission,
-		CareerAndSpeciesAlreadyChosen,
+    WorldClockAlreadySet,
+    SpiritClaimNotAvailable,
+    RareEggPurchaseNotAvailable,
+    PreorderEggNotAvailable,
+    SpiritAlreadyClaimed,
+    ClaimVerificationFailed,
+    InvalidPurchase,
+    NoAvailablePreorderId,
+    RaceMintMaxReached,
+    CareerMintMaxReached,
+    CannotHatchEgg,
+    CannotSendFoodToEgg,
+    NoFoodAvailable,
+    OverlordNotSet,
+    RequireOverlordAccount,
+    InvalidStatusType,
 }
 ```
 
 ## Calls
+### claim_spirit
+Claim a spirit for users that are on the whitelist.
 ```rust
-#[pallet::call]
-impl<T: Config> Pallet<T> {
-		/// Claim a spirit for accounts that are in the whitelist
-		#[transactional]
-		pub fn claim_spirit(
-            origin: OriginFor<T>,
-            serial: SerialId,
-            signature: Signature,
-            metadata: Metadata,
-		) -> DisplayResult {
-		
-		}
+origin: OriginFor<T>,
+serial_id: SerialId,
+signature: sr25519::Signature,
+metadata: BoundedVec<u8, T::StringLimit>,
+```
 
-		/// Buy a rare egg and choose the Race (limited #). The Duty will be determined
-		/// based on activities by account in Phala ecosystem at mint?
-		#[transactional]
-		pub fn buy_rare_egg(
-            origin: OriginFor<T>,
-            type: EggType,
-            race: Race,
-            career: Career,
-		) -> DisplayResult {
+### buy_rare_egg
+Buy a rare egg of either type Legendary or Founder.
+```rust
+origin: OriginFor<T>,
+egg_type: EggType,
+race: RaceType,
+career: CareerType,
+metadata: BoundedVec<u8, T::StringLimit>,
+```
 
-		}
+### preorder_egg
+Preorder an Egg for eligible users
+```rust
+origin: OriginFor<T>,
+race: RaceType,
+career: CareerType,
+metadata: BoundedVec<u8, T::StringLimit>,
+```
 
-		/// Preorder will either give the user a claim ticket for an Egg NFT or 
-		/// another NFT that will be used to be exchanged for a refund & something 
-		/// special TBD 
-		#[transactional]
-		pub fn preorder_egg(
-            origin: OriginFor<T>,
-            race: Race,
-            career: Career,
-		) -> DisplayResult {
+### mint_eggs
+This is an admin only function that will be called to do a bulk minting of all preordered egg
+```rust
+origin: OriginFor<T>
+```
 
-		}
+### start_hatching
+Initiate the hatching phase for an owner's Egg
+```rust
+origin: OriginFor<T>,
+collection_id: CollectionId,
+nft_id: NftId,
+```
 
-		/// Mint Eggs to the new owners
-		#[transactional]
-		pub fn mint_eggs(
-            origin: OriginFor<T>,
-            egg_owners: Vec<Serial_Id>,
-		) -> DisplayResult {
+### feed_egg
+Feed another egg to the current egg being hatched.
+```rust
+origin: OriginFor<T>,
+collection_id: CollectionId,
+nft_id: NftId,
+```
 
-		}
+### hatch_egg
+Hatch the egg that is currently being hatched.
+```rust
+origin: OriginFor<T>,
+collection_id: CollectionId,
+nft_id: NftId,
+```
 
-		/// Claim refund with claim ticket
-		#[transactional]
-		pub fn claim_refund(
-            origin: OriginFor<T>,
-            claim_ticket: Serial_Id,
-		) -> DisplayResult {
+### update_hatch_time
+This is an admin function to update eggs hatch times based on being in the top 10 of fed eggs within that era
+```rust
+origin: OriginFor<T>,
+collection_id: CollectionId,
+nft_id: NftId,
+reduced_time: u64,
+```
 
-		}
+### set_overlord
+Privileged function set the Overlord Admin account of Phala World.
+```rust
+origin: OriginFor<T>,
+new_overlord: T::AccountId,
+```
 
-		/// Start hatching egg
-		#[transactional]
-		pub fn start_hatching( 
-            origin: OriginFor<T>,
-            collection_id: CollectionId,
-            nft_id: NftId,
-        ) -> DisplayResult {
-            
-        }
+### initialize_world_clock
+Privileged function where Phala World Zero Day is set to begin the tracking of the official time starting at the current timestamp.
+```rust
+origin: OriginFor<T>,
+```
 
-		/// Send food to an Egg. The owner can be either another egg
-		/// egg owner or to the sender's own egg. However, an owner
-		/// sending to their own egg can only send twice per era.
-		#[transactional]
-		pub fn feed_egg(
-            origin: OriginFor<T>,
-            collection_id: CollectionId,
-            nft_id: NftId,
-		) -> DisplayResult {
-
-		}
-
-		/// Hatch an egg that is ready for hatching
-		pub fn hatch_egg(
-            origin: OriginFor<T>,
-            collection_id: CollectionId,
-            nft_id: NftId,
-		) -> DisplayResult {
-
-		}
-
-		/// This will be executed by Phala World for top 10 fed Eggs per era, ensure
-		/// origin is Admin Account
-		pub fn update_hatch_time(
-            origin: OriginFor<T>,
-            egg_owner: T::AccountId,
-            collection_id: CollectionId,
-            nft_id: NftId,
-            reduce_time_by: T::BlockNumber
-		) -> DisplayResult {
-
-        }
-		
-}
+### set_status_type
+Privileged function to set the status for one of the defined StatusTypes like ClaimSpirits, PurchaseRareEggs, or PreorderEggs
+```rust
+origin: OriginFor<T>,
+status: bool,
+status_type: StatusType,
 ```

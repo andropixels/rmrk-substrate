@@ -154,6 +154,14 @@ fn auto_increment_era_works() {
 			time: 5 * BLOCK_TIME_SECONDS + INIT_TIMESTAMP_SECONDS,
 			era: 1,
 		}));
+		fast_forward_to(16);
+		// Check Era is 1
+		assert_eq!(PhalaWorld::era(), 3);
+		// Check if event triggered
+		System::assert_last_event(MockEvent::PhalaWorld(crate::Event::NewEra {
+			time: 15 * BLOCK_TIME_SECONDS + INIT_TIMESTAMP_SECONDS,
+			era: 3,
+		}));
 	});
 }
 
