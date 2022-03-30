@@ -44,10 +44,19 @@ fn mint_collection(account: AccountId32) {
 fn setup_config(enable_status_type: StatusType) {
 	// Set Overlord account
 	assert_ok!(PhalaWorld::set_overlord(Origin::root(), OVERLORD));
+	let spirit_collection_id = RmrkCore::collection_index();
 	// Mint Spirits Collection
 	mint_collection(OVERLORD);
+	// Set Spirit Collection ID
+	assert_ok!(PhalaWorld::set_spirit_collection_id(
+		Origin::signed(OVERLORD),
+		spirit_collection_id
+	));
+	let egg_collection_id = RmrkCore::collection_index();
 	// Mint Eggs Collection
 	mint_collection(OVERLORD);
+	// Set Egg Collection ID
+	assert_ok!(PhalaWorld::set_egg_collection_id(Origin::signed(OVERLORD), egg_collection_id));
 	// Initialize the Phala World Clock
 	assert_ok!(PhalaWorld::initialize_world_clock(Origin::signed(OVERLORD)));
 	match enable_status_type {

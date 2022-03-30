@@ -36,13 +36,6 @@ mod benchmarking;
 
 pub use pallet::*;
 
-/// Spirit Collection ID
-pub const SPIRIT_COLLECTION_ID: u32 = 0;
-/// Constant for Collection ID for Eggs
-pub const EGGS_COLLECTION_ID: u32 = 1;
-/// Constant for amount of time it takes for an Egg to hatch after hatching is started
-pub const HATCHING_DURATION: u64 = 1_000_000;
-
 // #[cfg(feature = "std")]
 // use serde::{Deserialize, Serialize};
 //
@@ -177,6 +170,16 @@ pub mod pallet {
 	#[pallet::getter(fn race_type_count)]
 	pub type RaceTypeLeft<T: Config> = StorageMap<_, Twox64Concat, RaceType, u32, ValueQuery>;
 
+	/// Spirit Collection ID
+	#[pallet::storage]
+	#[pallet::getter(fn spirit_collection_id)]
+	pub type SpiritCollectionId<T: Config> = StorageValue<_, CollectionId, OptionQuery>;
+
+	/// Egg Collection ID
+	#[pallet::storage]
+	#[pallet::getter(fn egg_collection_id)]
+	pub type EggCollectionId<T: Config> = StorageValue<_, CollectionId, OptionQuery>;
+
 	/// Race StorageMap count
 	#[pallet::storage]
 	#[pallet::getter(fn career_type_count)]
@@ -197,7 +200,7 @@ pub mod pallet {
 					let current_era = <Era<T>>::get();
 					if secs_since_zero_day / T::SecondsPerEra::get() > current_era {
 						let new_era = Era::<T>::mutate(|era| {
-							*era = era.saturating_add(One::one());
+							*era = *era + 1;
 							*era
 						});
 						Self::deposit_event(Event::NewEra { time: current_time, era: new_era });
@@ -221,6 +224,10 @@ pub mod pallet {
 		pub can_purchase_rare_eggs: bool,
 		/// bool for if an Egg can be preordered
 		pub can_preorder_eggs: bool,
+		/// CollectionId of Spirit Collection
+		pub spirit_collection_id: Option<CollectionId>,
+		/// CollectionId of Egg Collection
+		pub egg_collection_id: Option<CollectionId>,
 	}
 
 	#[cfg(feature = "std")]
@@ -233,6 +240,8 @@ pub mod pallet {
 				can_claim_spirits: false,
 				can_purchase_rare_eggs: false,
 				can_preorder_eggs: false,
+				spirit_collection_id: None,
+				egg_collection_id: None,
 			}
 		}
 	}
@@ -254,6 +263,12 @@ pub mod pallet {
 			<CanPurchaseRareEggs<T>>::put(can_purchase_rare_eggs);
 			let can_preorder_eggs = self.can_preorder_eggs;
 			<CanPreorderEggs<T>>::put(can_preorder_eggs);
+			if let Some(spirit_collection_id) = self.spirit_collection_id {
+				<SpiritCollectionId<T>>::put(spirit_collection_id);
+			}
+			if let Some(egg_collection_id) = self.egg_collection_id {
+				<EggCollectionId<T>>::put(egg_collection_id);
+			}
 			// Set max mints per race and career
 			RaceTypeLeft::<T>::insert(RaceType::Cyborg, T::MaxMintPerRace::get());
 			RaceTypeLeft::<T>::insert(RaceType::Pandroid, T::MaxMintPerRace::get());
@@ -302,10 +317,13 @@ pub mod pallet {
 			nft_id: NftId,
 			owner: T::AccountId,
 		},
-		/// Refund claimed by owner that did not win an Egg
-		RefundClaimed {
-			price: BalanceOf<T>,
-			owner: T::AccountId,
+		/// Spirit collection id was set
+		SpiritCollectionIdSet {
+			collection_id: CollectionId,
+		},
+		/// Egg collection id was set
+		EggCollectionIdSet {
+			collection_id: CollectionId,
 		},
 		/// Egg received food from an account
 		EggFoodReceived {
@@ -382,6 +400,10 @@ pub mod pallet {
 		OverlordNotSet,
 		RequireOverlordAccount,
 		InvalidStatusType,
+		SpiritCollectionNotSet,
+		SpiritCollectionIdAlreadySet,
+		EggCollectionNotSet,
+		EggCollectionIdAlreadySet,
 	}
 
 	// Dispatchable functions allows users to interact with the pallet and invoke state changes.
@@ -414,6 +436,9 @@ pub mod pallet {
 			ensure!(CanClaimSpirits::<T>::get(), Error::<T>::SpiritClaimNotAvailable);
 			let sender = ensure_signed(origin)?;
 			let overlord = Overlord::<T>::get().ok_or(Error::<T>::OverlordNotSet)?;
+			// Has Spirit Collection been set
+			let spirit_collection_id =
+				SpiritCollectionId::<T>::get().ok_or(Error::<T>::SpiritCollectionNotSet)?;
 			// Has the SerialId already been claimed
 			ensure!(
 				!ClaimedSpirits::<T>::contains_key(serial_id),
@@ -428,7 +453,7 @@ pub mod pallet {
 			pallet_rmrk_core::Pallet::<T>::mint_nft(
 				Origin::<T>::Signed(overlord).into(),
 				sender.clone(),
-				SPIRIT_COLLECTION_ID,
+				spirit_collection_id,
 				None,
 				None,
 				metadata,
@@ -460,13 +485,16 @@ pub mod pallet {
 			ensure!(CanPurchaseRareEggs::<T>::get(), Error::<T>::RareEggPurchaseNotAvailable);
 			let sender = ensure_signed(origin.clone())?;
 			let overlord = Overlord::<T>::get().ok_or(Error::<T>::OverlordNotSet)?;
+			// Ensure egg collection is set
+			let egg_collection_id =
+				EggCollectionId::<T>::get().ok_or(Error::<T>::EggCollectionNotSet)?;
 			// Get Egg Price based on EggType
 			let egg_price = match egg_type {
 				EggType::Founder => T::FounderEggPrice::get(),
 				EggType::Legendary => T::LegendaryEggPrice::get(),
 				_ => return Err(Error::<T>::InvalidPurchase.into()),
 			};
-			let nft_id = pallet_rmrk_core::NextNftId::<T>::get(EGGS_COLLECTION_ID);
+			let nft_id = pallet_rmrk_core::NextNftId::<T>::get(egg_collection_id);
 			// Check if race and career types have mints left
 			Self::has_race_type_left(&race)?;
 			Self::has_career_type_left(&career)?;
@@ -491,7 +519,7 @@ pub mod pallet {
 			pallet_rmrk_core::Pallet::<T>::mint_nft(
 				Origin::<T>::Signed(overlord.clone()).into(),
 				sender.clone(),
-				EGGS_COLLECTION_ID,
+				egg_collection_id,
 				None,
 				None,
 				metadata,
@@ -499,10 +527,10 @@ pub mod pallet {
 
 			Self::decrement_race_type(race);
 			Self::decrement_career_type(career);
-			Eggs::<T>::insert(EGGS_COLLECTION_ID, nft_id, egg);
+			Eggs::<T>::insert(egg_collection_id, nft_id, egg);
 
 			Self::deposit_event(Event::RareEggPurchased {
-				collection_id: EGGS_COLLECTION_ID,
+				collection_id: egg_collection_id,
 				nft_id,
 				owner: sender,
 			});
@@ -537,7 +565,7 @@ pub mod pallet {
 				<PreorderIndex<T>>::try_mutate(|n| -> Result<PreorderId, DispatchError> {
 					let id = *n;
 					ensure!(id != PreorderId::max_value(), Error::<T>::NoAvailablePreorderId);
-					*n = n.saturating_add(One::one());
+					*n = *n + 1;
 					Ok(id)
 				})?;
 
@@ -568,6 +596,9 @@ pub mod pallet {
 			// Ensure Overlord account makes call
 			let sender = ensure_signed(origin)?;
 			Self::ensure_overlord(sender.clone())?;
+			// Ensure egg collection is set
+			let egg_collection_id =
+				EggCollectionId::<T>::get().ok_or(Error::<T>::EggCollectionNotSet)?;
 			// Iterate through Preorders
 			for preorder_id in Preorders::<T>::iter_keys() {
 				if let Some(preorder) = Preorders::<T>::take(preorder_id) {
@@ -581,7 +612,7 @@ pub mod pallet {
 						hatching_duration: 0,
 					};
 					// Next NFT ID of Collection
-					let nft_id = pallet_rmrk_core::NextNftId::<T>::get(EGGS_COLLECTION_ID);
+					let nft_id = pallet_rmrk_core::NextNftId::<T>::get(egg_collection_id);
 
 					// Get payment from owner's reserve
 					<T as pallet::Config>::Currency::unreserve(&preorder.owner, egg_price);
@@ -595,16 +626,16 @@ pub mod pallet {
 					pallet_rmrk_core::Pallet::<T>::mint_nft(
 						Origin::<T>::Signed(sender.clone()).into(),
 						preorder.owner.clone(),
-						EGGS_COLLECTION_ID,
+						egg_collection_id,
 						None,
 						None,
 						preorder.metadata,
 					)?;
 
-					Eggs::<T>::insert(EGGS_COLLECTION_ID, nft_id, egg);
+					Eggs::<T>::insert(egg_collection_id, nft_id, egg);
 
 					Self::deposit_event(Event::EggMinted {
-						collection_id: EGGS_COLLECTION_ID,
+						collection_id: egg_collection_id,
 						nft_id,
 						owner: preorder.owner,
 					});
@@ -762,6 +793,53 @@ pub mod pallet {
 			}
 			Ok(Pays::No.into())
 		}
+
+		/// Privileged function to set the collection id for the Spirits collection
+		///
+		/// Parameters:
+		/// - `origin` - Expected Overlord admin account to set the Spirit Collection ID
+		/// - `collection_id` - Collection ID of the Spirit Collection
+		#[pallet::weight(0)]
+		pub fn set_spirit_collection_id(
+			origin: OriginFor<T>,
+			collection_id: CollectionId,
+		) -> DispatchResultWithPostInfo {
+			// Ensure Overlord account makes call
+			let sender = ensure_signed(origin)?;
+			Self::ensure_overlord(sender)?;
+			// If Spirit Collection ID is greater than 0 then the collection ID was already set
+			ensure!(
+				SpiritCollectionId::<T>::get().is_none(),
+				Error::<T>::SpiritCollectionIdAlreadySet
+			);
+			<SpiritCollectionId<T>>::put(collection_id);
+
+			Self::deposit_event(Event::SpiritCollectionIdSet { collection_id });
+
+			Ok(Pays::No.into())
+		}
+
+		/// Privileged function to set the collection id for the Egg collection
+		///
+		/// Parameters:
+		/// - `origin` - Expected Overlord admin account to set the Egg Collection ID
+		/// - `collection_id` - Collection ID of the Egg Collection
+		#[pallet::weight(0)]
+		pub fn set_egg_collection_id(
+			origin: OriginFor<T>,
+			collection_id: CollectionId,
+		) -> DispatchResultWithPostInfo {
+			// Ensure Overlord account makes call
+			let sender = ensure_signed(origin)?;
+			Self::ensure_overlord(sender)?;
+			// If Egg Collection ID is greater than 0 then the collection ID was already set
+			ensure!(EggCollectionId::<T>::get().is_none(), Error::<T>::EggCollectionIdAlreadySet);
+			<EggCollectionId<T>>::put(collection_id);
+
+			Self::deposit_event(Event::EggCollectionIdSet { collection_id });
+
+			Ok(Pays::No.into())
+		}
 	}
 }
 
@@ -849,7 +927,7 @@ impl<T: Config> Pallet<T> {
 	/// - `race`: The Race to increment count
 	fn decrement_race_type(race: RaceType) -> DispatchResult {
 		RaceTypeLeft::<T>::mutate(race, |race_count| {
-			*race_count = race_count.saturating_sub(One::one());
+			*race_count = *race_count - 1;
 			*race_count
 		});
 
@@ -862,7 +940,7 @@ impl<T: Config> Pallet<T> {
 	/// - `career`: The Career to increment count
 	fn decrement_career_type(career: CareerType) -> DispatchResult {
 		CareerTypeLeft::<T>::mutate(career, |career_count| {
-			*career_count = career_count.saturating_sub(One::one());
+			*career_count = *career_count - 1;
 			*career_count
 		});
 
@@ -875,7 +953,7 @@ impl<T: Config> Pallet<T> {
 	/// - `race`: The Race to increment count
 	fn increment_race_type(race: RaceType) -> DispatchResult {
 		RaceTypeLeft::<T>::mutate(race, |race_count| {
-			*race_count = race_count.saturating_add(One::one());
+			*race_count = *race_count + 1;
 			*race_count
 		});
 
@@ -888,7 +966,7 @@ impl<T: Config> Pallet<T> {
 	/// - `career`: The Career to increment count
 	fn increment_career_type(career: CareerType) -> DispatchResult {
 		CareerTypeLeft::<T>::mutate(career, |career_count| {
-			*career_count = career_count.saturating_add(One::one());
+			*career_count = *career_count + 1;
 			*career_count
 		});
 

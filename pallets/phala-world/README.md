@@ -134,6 +134,16 @@ pub type CareerTypeLeft<T: Config> = StorageMap<_, Twox64Concat, CareerType, u32
 #[pallet::storage]
 #[pallet::getter(fn overlord)]
 pub(super) type Overlord<T: Config> = StorageValue<_, T::AccountId, OptionQuery>;
+
+/// Spirit Collection ID
+#[pallet::storage]
+#[pallet::getter(fn spirit_collection_id)]
+pub type SpiritCollectionId<T: Config> = StorageValue<_, CollectionId, OptionQuery>;
+
+/// Egg Collection ID
+#[pallet::storage]
+#[pallet::getter(fn egg_collection_id)]
+pub type EggCollectionId<T: Config> = StorageValue<_, CollectionId, OptionQuery>;
 ```
 
 ## Errors
@@ -157,6 +167,10 @@ pub enum Error<T> {
     OverlordNotSet,
     RequireOverlordAccount,
     InvalidStatusType,
+    SpiritCollectionNotSet,
+    SpiritCollectionIdAlreadySet,
+    EggCollectionNotSet,
+    EggCollectionIdAlreadySet,
 }
 ```
 
@@ -247,4 +261,18 @@ Privileged function to set the status for one of the defined StatusTypes like Cl
 origin: OriginFor<T>,
 status: bool,
 status_type: StatusType,
+```
+
+### set_spirit_collection_id
+Privileged function to set the collection id for the Spirits collection
+```rust
+origin: OriginFor<T>,
+collection_id: CollectionId,
+```
+
+### set_egg_collection_id
+Privileged function to set the collection id for the Egg collection
+```rust
+origin: OriginFor<T>,
+collection_id: CollectionId,
 ```
